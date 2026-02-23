@@ -1,6 +1,7 @@
 import random
 import logging
 from typing import Any, Optional
+from pydantic import PrivateAttr
 from .models import Entity, Position
 from .brain import SimpleBrain
 
@@ -8,17 +9,20 @@ logger = logging.getLogger("Agent")
 
 class Citizen(Entity):
     goal: str = "explore"
+    _brain: Any = PrivateAttr()
 
     def __init__(self, **data):
         super().__init__(**data)
-        # Ensure _brain is set up after Pydantic initialization
-        object.__setattr__(self, '_brain', SimpleBrain(self))
+        self._brain = SimpleBrain(self)
 
     async def update(self, world):
+        if not self.active:
+            return
+
         # 1. Perception/Decision
         self.goal = await self._brain.decide(world)
         
-        # 2. Action execution (Basic Movement)
+        # 2. Action execution (Basic Movement toward goal logic placeholder)
         dx = random.choice([-1, 0, 1])
         dy = random.choice([-1, 0, 1])
         
@@ -28,7 +32,12 @@ class Citizen(Entity):
         self.position = Position(x=new_x, y=new_y)
         
         # 3. State decay
-        self.energy -= 0.2
-        if self.energy < 0:
+        decay_rate = 0.5 if self.goal == "search_food" else 0.2
+        self.energy -= decay_rate
+        
+        if self.energy <= 0:
             self.energy = 0
-            logger.warning(f"{self.name} is exhausted!")
+            self.active = False
+            logger.warning(f"{self.name} has collapsed from exhaustion.")
+        elif self.energy < 20:
+            logger.debug(f"{self.name} is very low on energy.")

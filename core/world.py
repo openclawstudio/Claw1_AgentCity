@@ -23,6 +23,14 @@ class World:
         self.entities[entity.id] = entity
         logger.info(f"Entity {entity.name} ({entity.id}) spawned at {entity.position}")
 
+    def get_nearby_entities(self, pos: Position, radius: int = 5) -> List[Entity]:
+        """Basic spatial query"""
+        nearby = []
+        for e in self.entities.values():
+            if abs(e.position.x - pos.x) <= radius and abs(e.position.y - pos.y) <= radius:
+                nearby.append(e)
+        return nearby
+
     async def start(self):
         self.running = True
         logger.info("World started.")
@@ -31,7 +39,8 @@ class World:
                 await self.update()
                 self._tick_count += 1
                 if self._tick_count % 10 == 0:
-                    logger.info(f"World Heartbeat: Tick {self._tick_count} | Entities: {len(self.entities)}")
+                    active_count = sum(1 for e in self.entities.values() if e.active)
+                    logger.info(f"World Heartbeat: Tick {self._tick_count} | Entities: {len(self.entities)} ({active_count} active)")
                 await asyncio.sleep(self.tick_rate)
         except asyncio.CancelledError:
             self.running = False
@@ -41,19 +50,19 @@ class World:
             self.running = False
 
     async def update(self):
-        if not self.entities:
+        # Create a list of current entities to avoid dict mutation issues during update
+        current_entities = list(self.entities.values())
+        if not current_entities:
             return
             
-        # Use return_exceptions=True to prevent one agent's failure from stopping the world
         results = await asyncio.gather(
-            *[entity.update(self) for entity in self.entities.values()],
+            *[entity.update(self) for entity in current_entities if entity.active],
             return_exceptions=True
         )
         
         for i, res in enumerate(results):
             if isinstance(res, Exception):
-                entity_id = list(self.entities.keys())[i]
-                logger.error(f"Entity {entity_id} failed update: {res}")
+                logger.error(f"Update failed for an entity: {res}")
 
     def stop(self):
         self.running = False
