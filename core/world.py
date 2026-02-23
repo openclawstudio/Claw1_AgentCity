@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from .models import Position, Entity
 from .config import settings
 
@@ -21,10 +21,13 @@ class World:
 
     def add_entity(self, entity: Entity):
         self.entities[entity.id] = entity
-        logger.info(f"Entity {entity.name} ({entity.id}) spawned at {entity.position}")
+        logger.info(f"Entity {entity.name} ({entity.id}) joined the world at {entity.position}")
+
+    def remove_entity(self, entity_id: str):
+        if entity_id in self.entities:
+            del self.entities[entity_id]
 
     def get_nearby_entities(self, pos: Position, radius: int = 5) -> List[Entity]:
-        """Basic spatial query"""
         nearby = []
         for e in self.entities.values():
             if abs(e.position.x - pos.x) <= radius and abs(e.position.y - pos.y) <= radius:
@@ -46,23 +49,24 @@ class World:
             self.running = False
             logger.info("World execution cancelled.")
         except Exception as e:
-            logger.error(f"Critical World Error: {e}")
+            logger.error(f"Critical World Error: {e}", exc_info=True)
             self.running = False
 
     async def update(self):
-        # Create a list of current entities to avoid dict mutation issues during update
-        current_entities = list(self.entities.values())
-        if not current_entities:
-            return
-            
-        results = await asyncio.gather(
-            *[entity.update(self) for entity in current_entities if entity.active],
-            return_exceptions=True
-        )
+        # Snapshot keys to avoid dictionary size change during iteration
+        entity_ids = list(self.entities.keys())
+        tasks = []
         
-        for i, res in enumerate(results):
-            if isinstance(res, Exception):
-                logger.error(f"Update failed for an entity: {res}")
+        for eid in entity_ids:
+            entity = self.entities.get(eid)
+            if entity and entity.active:
+                tasks.append(entity.update(self))
+        
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for res in results:
+                if isinstance(res, Exception):
+                    logger.error(f"Entity update error: {res}")
 
     def stop(self):
         self.running = False

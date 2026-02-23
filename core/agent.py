@@ -22,16 +22,27 @@ class Citizen(Entity):
         # 1. Perception/Decision
         self.goal = await self._brain.decide(world)
         
-        # 2. Action execution (Basic Movement toward goal logic placeholder)
-        dx = random.choice([-1, 0, 1])
-        dy = random.choice([-1, 0, 1])
+        # 2. Action execution
+        target_pos = self.position
+        if self.goal == "search_food":
+            # Move toward center (placeholder for food source logic)
+            dx = 1 if world.width // 2 > self.position.x else -1
+            dy = 1 if world.height // 2 > self.position.y else -1
+        else:
+            # Wander
+            dx = random.choice([-1, 0, 1])
+            dy = random.choice([-1, 0, 1])
         
         new_x = max(0, min(world.width - 1, self.position.x + dx))
         new_y = max(0, min(world.height - 1, self.position.y + dy))
-        
         self.position = Position(x=new_x, y=new_y)
         
-        # 3. State decay
+        # 3. Consumption/Recovery
+        if self.goal == "search_food" and self.position.x == world.width // 2 and self.position.y == world.height // 2:
+            self.energy = min(100.0, self.energy + 20)
+            logger.info(f"{self.name} found food and recovered energy.")
+
+        # 4. State decay
         decay_rate = 0.5 if self.goal == "search_food" else 0.2
         self.energy -= decay_rate
         
@@ -39,5 +50,3 @@ class Citizen(Entity):
             self.energy = 0
             self.active = False
             logger.warning(f"{self.name} has collapsed from exhaustion.")
-        elif self.energy < 20:
-            logger.debug(f"{self.name} is very low on energy.")
