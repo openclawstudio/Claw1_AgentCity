@@ -23,11 +23,14 @@ class Citizen(Entity):
         self.goal = await self._brain.decide(world)
         
         # 2. Action execution
-        target_pos = self.position
+        dx, dy = 0, 0
         if self.goal == "search_food":
             # Move toward center (placeholder for food source logic)
-            dx = 1 if world.width // 2 > self.position.x else -1
-            dy = 1 if world.height // 2 > self.position.y else -1
+            target_x, target_y = world.width // 2, world.height // 2
+            if self.position.x != target_x:
+                dx = 1 if target_x > self.position.x else -1
+            if self.position.y != target_y:
+                dy = 1 if target_y > self.position.y else -1
         else:
             # Wander
             dx = random.choice([-1, 0, 1])
@@ -40,9 +43,10 @@ class Citizen(Entity):
         # 3. Consumption/Recovery
         if self.goal == "search_food" and self.position.x == world.width // 2 and self.position.y == world.height // 2:
             self.energy = min(100.0, self.energy + 20)
-            logger.info(f"{self.name} found food and recovered energy.")
+            logger.info(f"{self.name} found food and recovered energy. Current Energy: {self.energy:.1f}")
 
         # 4. State decay
+        # Search food is more taxing than wandering
         decay_rate = 0.5 if self.goal == "search_food" else 0.2
         self.energy -= decay_rate
         

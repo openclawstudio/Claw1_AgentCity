@@ -56,17 +56,20 @@ class World:
         # Snapshot keys to avoid dictionary size change during iteration
         entity_ids = list(self.entities.keys())
         tasks = []
+        active_entities = []
         
         for eid in entity_ids:
             entity = self.entities.get(eid)
             if entity and entity.active:
                 tasks.append(entity.update(self))
+                active_entities.append(entity)
         
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            for res in results:
+            for i, res in enumerate(results):
                 if isinstance(res, Exception):
-                    logger.error(f"Entity update error: {res}")
+                    entity_name = active_entities[i].name if i < len(active_entities) else "Unknown"
+                    logger.error(f"Entity '{entity_name}' update error: {res}")
 
     def stop(self):
         self.running = False
