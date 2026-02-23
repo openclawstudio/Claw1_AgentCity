@@ -8,10 +8,11 @@ class CitizenAgent:
     async def decide_action(self, world):
         """Autonomous decision making logic"""
         if self.state.energy < 20:
-            # Priority 1: Rest
-            self.move_towards(Vector2D(x=5, y=5)) 
+            # Priority 1: Rest in Park
+            park_center = Vector2D(x=5, y=5)
+            self.move_towards(park_center) 
         elif self.state.economy.balance < 20:
-            # Priority 2: Work/Trade
+            # Priority 2: Work/Trade in Market
             await self.handle_economy(world)
         else:
             # Priority 3: Social/Explore
@@ -37,5 +38,6 @@ class CitizenAgent:
                 self.state.economy.balance += 10.0
                 self.state.energy -= 10.0
         else:
-            # Move toward market to find work
-            self.move_towards(Vector2D(x=25, y=25))
+            # Move toward market center
+            market_center = Vector2D(x=25, y=25)
+            self.move_towards(market_center)
