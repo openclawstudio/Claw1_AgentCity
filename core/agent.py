@@ -27,7 +27,7 @@ class Citizen(Entity):
         # 2. Action execution
         dx, dy = 0, 0
         if self.goal == "search_food":
-            # Target the first resource found, or move to center if none found
+            # Target the first resource found
             resources = [e for e in nearby if isinstance(e, Resource) and not e.depleted]
             if resources:
                 target = resources[0].position
@@ -49,11 +49,15 @@ class Citizen(Entity):
         
         # 3. Consumption/Recovery
         if self.goal == "search_food":
-            at_resource = [e for e in world.get_nearby_entities(self.position, radius=0) if isinstance(e, Resource)]
+            at_resource = [e for e in world.get_nearby_entities(self.position, radius=0) if isinstance(e, Resource) and not e.depleted]
             if at_resource:
                 res = at_resource[0]
                 gain = min(res.value, 100.0 - self.energy)
                 self.energy += gain
+                # Simple depletion logic: resource loses value as consumed
+                res.value -= gain
+                if res.value <= 0:
+                    res.depleted = True
                 logger.info(f"{self.name} consumed {res.name} at {self.position}. Energy: {self.energy:.1f}")
 
         # 4. State decay
