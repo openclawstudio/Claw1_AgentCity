@@ -1,20 +1,28 @@
 import pytest
+import asyncio
 from core.world import World
-from core.agent import Citizen
-from core.models import Position
+from core.models import AgentState, Vector2D
+from core.agent import CitizenAgent
 
 @pytest.mark.asyncio
 async def test_agent_movement():
-    world = World(width=10, height=10)
-    citizen = Citizen(name="Tester", position=Position(x=5, y=5))
-    world.add_entity(citizen)
+    world = World(10, 10)
+    state = AgentState(id="test", name="test", position=Vector2D(x=0, y=0))
+    agent = CitizenAgent(state)
+    agent.move_towards(Vector2D(x=5, y=5))
+    assert state.position.x == 1
+    assert state.position.y == 1
+
+@pytest.mark.asyncio
+async def test_economic_transaction():
+    world = World()
+    s1 = AgentState(id="a1", name="a1", position=Vector2D(x=0,y=0))
+    s2 = AgentState(id="a2", name="a2", position=Vector2D(x=0,y=0))
+    s1.economy.balance = 50
+    world.add_agent(s1)
+    world.add_agent(s2)
     
-    initial_pos = (citizen.position.x, citizen.position.y)
-    await citizen.update(world)
-    new_pos = (citizen.position.x, citizen.position.y)
-    
-    # Check that energy decreased
-    assert citizen.energy < 100.0
-    # Check position stays within bounds
-    assert 0 <= citizen.position.x < 10
-    assert 0 <= citizen.position.y < 10
+    success = await world.process_transaction("a1", "a2", 20.0, "food")
+    assert success is True
+    assert world.agents["a1"].economy.balance == 30
+    assert world.agents["a2"].economy.balance == 20
