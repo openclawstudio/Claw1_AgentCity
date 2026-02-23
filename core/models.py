@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from enum import Enum
@@ -16,7 +17,7 @@ class Vector2D(BaseModel):
     x: int
     y: int
 
-    def distance_to(self, other: 'Vector2D') -> float:
+    def distance_to(self, other: Vector2D) -> float:
         return ((self.x - other.x)**2 + (self.y - other.y)**2)**0.5
 
 class EconomicState(BaseModel):

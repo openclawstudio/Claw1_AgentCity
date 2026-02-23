@@ -50,6 +50,9 @@ async def main():
         state.economy.balance = random.uniform(10.0, 30.0)
         city.add_agent(state)
         agents.append(CitizenAgent(state))
+        
+    # Create a wrapper for businesses to satisfy the loop if needed
+    business_entities = [BusinessAgent(city.agents["market_stall_1"]), BusinessAgent(city.agents["town_hall"])]
 
     print("\n--- AgentCity MVP Starting ---")
     print(f"Initialized city with {len(agents)} citizens and {len(city.services)} service types.\n")
@@ -60,13 +63,14 @@ async def main():
             await city.tick()
             
             # 2. Run Agents
-            tasks = [agent.decide_action(city) for agent in agents]
-            await asyncio.gather(*tasks)
+            citizen_tasks = [agent.decide_action(city) for agent in agents]
+            business_tasks = [biz.decide_action(city) for biz in business_entities]
+            await asyncio.gather(*(citizen_tasks + business_tasks))
             
             # 3. Reporting
             if tick % 20 == 0:
                 active_agents = [a for a in agents if a.state.energy > 0]
-                avg_bal = sum(a.state.economy.balance for a in agents) / len(agents)
+                avg_bal = sum(a.state.economy.balance for a in agents) / len(agents) if agents else 0
                 print(f"Tick {tick:03d} | Active: {len(active_agents)} | Avg $: {avg_bal:.2f} | TXs: {len(city.ledger.history)}")
                 if active_agents:
                     lead = random.choice(active_agents)

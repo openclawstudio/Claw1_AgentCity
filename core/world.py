@@ -38,7 +38,8 @@ class World:
 
     def get_closest_service(self, pos: Vector2D, service_type: str) -> Optional[Vector2D]:
         service_ids = self.services.get(service_type, [])
-        if not service_ids: return None
+        if not service_ids:
+            return None
         
         closest_pos = None
         min_dist = float('inf')
@@ -58,6 +59,9 @@ class World:
         return "suburbs"
 
     async def process_transaction(self, sender_id: str, receiver_id: str, amount: float, item: str = None) -> bool:
+        if amount <= 0:
+            return False
+            
         sender = self.agents.get(sender_id)
         receiver = self.agents.get(receiver_id)
         
