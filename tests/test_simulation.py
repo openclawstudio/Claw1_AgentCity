@@ -1,14 +1,15 @@
 import pytest
 from core.world import World
-from core.models import AgentState, Vector2D
+from core.models import AgentState, Vector2D, SimulationConfig
 from core.agent import CitizenAgent
 
 @pytest.mark.asyncio
 async def test_agent_movement():
-    world = World(10, 10)
+    config = SimulationConfig(width=10, height=10)
+    world = World(config)
     state = AgentState(id="test", name="test", position=Vector2D(x=0, y=0))
     agent = CitizenAgent(state)
-    # Fixed: Passing world object to move_towards
+    # Move towards (5,5) should increment x and y by 1
     agent.move_towards(Vector2D(x=5, y=5), world)
     assert state.position.x == 1
     assert state.position.y == 1
