@@ -1,33 +1,48 @@
 import asyncio
 import logging
-from typing import Dict, List
+from typing import Dict, List, Any
 from .models import Position, Entity
+from .config import settings
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger("World")
 
 class World:
-    def __init__(self, width: int = 100, height: int = 100):
-        self.width = width
-        self.height = height
+    def __init__(self, width: int = None, height: int = None):
+        self.width = width or settings.WORLD_WIDTH
+        self.height = height or settings.WORLD_HEIGHT
         self.entities: Dict[str, Entity] = {}
-        self.tick_rate = 1.0  # Seconds per tick
+        self.tick_rate = settings.TICK_RATE
         self.running = False
+        self._tick_count = 0
 
     def add_entity(self, entity: Entity):
         self.entities[entity.id] = entity
-        logger.info(f"Entity {entity.id} spawned at {entity.position}")
+        logger.info(f"Entity {entity.name} ({entity.id}) spawned at {entity.position}")
 
     async def start(self):
         self.running = True
-        tick_count = 0
-        while self.running:
-            await self.update()
-            tick_count += 1
-            if tick_count % 10 == 0:
-                logger.info(f"World Heartbeat: Tick {tick_count}")
-            await asyncio.sleep(self.tick_rate)
+        logger.info("World started.")
+        try:
+            while self.running:
+                await self.update()
+                self._tick_count += 1
+                if self._tick_count % 10 == 0:
+                    logger.info(f"World Heartbeat: Tick {self._tick_count} | Entities: {len(self.entities)}")
+                await asyncio.sleep(self.tick_rate)
+        except asyncio.CancelledError:
+            self.running = False
+            logger.info("World execution cancelled.")
 
     async def update(self):
-        for entity in self.entities.values():
-            await entity.update(self)
+        # Use asyncio.gather for concurrent entity updates
+        tasks = [entity.update(self) for entity in self.entities.values()]
+        if tasks:
+            await asyncio.gather(*tasks)
+
+    def stop(self):
+        self.running = False
+        logger.info("Stopping world...")
