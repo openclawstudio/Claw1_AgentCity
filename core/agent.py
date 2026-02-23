@@ -1,14 +1,24 @@
 import random
 import logging
 from .models import Entity, Position
+from .brain import SimpleBrain
 
 logger = logging.getLogger("Agent")
 
 class Citizen(Entity):
     goal: str = "explore"
+    brain: Any = None
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.brain:
+            self.brain = SimpleBrain(self)
 
     async def update(self, world):
-        # Basic AI logic: Random movement for MVP phase
+        # 1. Perception/Decision
+        self.goal = await self.brain.decide(world)
+        
+        # 2. Action execution (Basic Movement)
         dx = random.choice([-1, 0, 1])
         dy = random.choice([-1, 0, 1])
         
@@ -16,9 +26,9 @@ class Citizen(Entity):
         new_y = max(0, min(world.height - 1, self.position.y + dy))
         
         self.position = Position(x=new_x, y=new_y)
-        self.energy -= 0.1
         
-        if self.energy < 20:
-            self.goal = "find_food"
-        elif self.energy > 80:
-            self.goal = "work"
+        # 3. State decay
+        self.energy -= 0.2
+        if self.energy < 0:
+            self.energy = 0
+            logger.warning(f"{self.name} is exhausted!")
