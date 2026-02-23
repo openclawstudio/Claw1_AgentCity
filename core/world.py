@@ -36,12 +36,24 @@ class World:
         except asyncio.CancelledError:
             self.running = False
             logger.info("World execution cancelled.")
+        except Exception as e:
+            logger.error(f"Critical World Error: {e}")
+            self.running = False
 
     async def update(self):
-        # Use asyncio.gather for concurrent entity updates
-        tasks = [entity.update(self) for entity in self.entities.values()]
-        if tasks:
-            await asyncio.gather(*tasks)
+        if not self.entities:
+            return
+            
+        # Use return_exceptions=True to prevent one agent's failure from stopping the world
+        results = await asyncio.gather(
+            *[entity.update(self) for entity in self.entities.values()],
+            return_exceptions=True
+        )
+        
+        for i, res in enumerate(results):
+            if isinstance(res, Exception):
+                entity_id = list(self.entities.keys())[i]
+                logger.error(f"Entity {entity_id} failed update: {res}")
 
     def stop(self):
         self.running = False
