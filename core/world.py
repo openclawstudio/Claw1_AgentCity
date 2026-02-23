@@ -3,7 +3,6 @@ import logging
 from typing import Dict, List, Optional
 from core.models import AgentState, Vector2D, Transaction, EntityType
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WorldEngine")
 
 class Ledger:
@@ -21,7 +20,7 @@ class World:
         self.tick_counter = 0
         self.agents: Dict[str, AgentState] = {}
         self.ledger = Ledger()
-        # Zoning: Defines spatial rules
+        self.events: List[dict] = []  # Simple event bus for localized interactions
         self.zones = {
             "park": {"x": range(0, 11), "y": range(0, 11), "bonus": "energy_regen"},
             "market": {"x": range(20, 31), "y": range(20, 31), "bonus": "trade_hub"}
@@ -36,8 +35,8 @@ class World:
                 return zone_name
         return "suburbs"
 
-    def get_entities_at(self, pos: Vector2D, exclude_id: Optional[str] = None) -> List[AgentState]:
-        return [a for a in self.agents.values() if a.position.x == pos.x and a.position.y == pos.y and a.id != exclude_id]
+    def emit_event(self, event_type: str, data: dict):
+        self.events.append({"tick": self.tick_counter, "type": event_type, **data})
 
     async def process_transaction(self, sender_id: str, receiver_id: str, amount: float, item: str = None) -> bool:
         sender = self.agents.get(sender_id)
@@ -58,18 +57,17 @@ class World:
         return False
 
     async def tick(self):
-        """Advance the world state by one heartbeat."""
         self.tick_counter += 1
+        # Clear old events
+        if len(self.events) > 100: self.events = self.events[-100:]
+        
         for agent_id, state in self.agents.items():
-            # Apply Zone Effects
             zone = self.get_zone(state.position)
             if zone == "park" and state.energy > 0:
                 state.energy = min(100.0, state.energy + 3.0)
             
-            # Health check: Only active agents drain energy
             if state.energy > 0:
                 state.energy -= 0.5
-                # Prevent negative energy
-                if state.energy < 0:
+                if state.energy <= 0:
                     state.energy = 0
-                    logger.warning(f"Agent {agent_id} ({state.name}) has collapsed from exhaustion.")
+                    logger.warning(f"Agent {agent_id} ({state.name}) has collapsed.")

@@ -1,5 +1,4 @@
 import pytest
-import asyncio
 from core.world import World
 from core.models import AgentState, Vector2D
 from core.agent import CitizenAgent
@@ -9,7 +8,8 @@ async def test_agent_movement():
     world = World(10, 10)
     state = AgentState(id="test", name="test", position=Vector2D(x=0, y=0))
     agent = CitizenAgent(state)
-    agent.move_towards(Vector2D(x=5, y=5))
+    # Fixed: Passing world object to move_towards
+    agent.move_towards(Vector2D(x=5, y=5), world)
     assert state.position.x == 1
     assert state.position.y == 1
 
