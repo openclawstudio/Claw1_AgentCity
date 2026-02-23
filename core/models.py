@@ -1,34 +1,38 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Any, Dict
-import uuid
+from typing import List, Optional, Dict
+from enum import Enum
 
-class Position(BaseModel):
+class EntityType(str, Enum):
+    CITIZEN = "citizen"
+    BUSINESS = "business"
+    INFRASTRUCTURE = "infrastructure"
+
+class JobStatus(str, Enum):
+    UNEMPLOYED = "unemployed"
+    EMPLOYED = "employed"
+    BUSINESS_OWNER = "business_owner"
+
+class Vector2D(BaseModel):
     x: int
     y: int
 
-    def __str__(self):
-        return f"({self.x}, {self.y})"
-
-    def __eq__(self, other):
-        if not isinstance(other, Position):
-            return False
-        return self.x == other.x and self.y == other.y
-
-class Entity(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    position: Position
-    energy: float = 100.0
+class EconomicState(BaseModel):
     balance: float = 0.0
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    active: bool = True
-    kind: str = "entity"
+    inventory: Dict[str, int] = {}
+    job_status: JobStatus = JobStatus.UNEMPLOYED
+    employer_id: Optional[str] = None
 
-    async def update(self, world: Any):
-        """Base update logic for all entities"""
-        pass
+class AgentState(BaseModel):
+    id: str
+    name: str
+    position: Vector2D
+    energy: float = 100.0
+    economy: EconomicState = Field(default_factory=EconomicState)
+    type: EntityType = EntityType.CITIZEN
 
-class Resource(Entity):
-    kind: str = "resource"
-    value: float = 20.0
-    depleted: bool = False
+class Transaction(BaseModel):
+    sender_id: str
+    receiver_id: str
+    amount: float
+    item: Optional[str] = None
+    timestamp: int

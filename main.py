@@ -1,58 +1,39 @@
 import asyncio
-import signal
-import logging
-import sys
+import uuid
 from core.world import World
-from core.agent import Citizen
-from core.models import Position, Resource
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("Main")
+from core.agent import CitizenAgent
+from core.models import AgentState, Vector2D
 
 async def main():
-    city = World(width=50, height=50)
+    city = World(50, 50)
     
-    # Add static food sources (Resources)
-    food_source = Resource(name="Market", position=Position(x=25, y=25), value=30)
-    city.add_entity(food_source)
-    
-    # Seed citizens
-    names = ["Alice", "Bob", "Charlie", "Dave"]
-    for i, name in enumerate(names):
-        citizen = Citizen(
-            name=name, 
-            position=Position(x=10 + i*5, y=10 + i*5)
+    # Spawn initial citizens
+    agents = []
+    for i in range(5):
+        state = AgentState(
+            id=str(uuid.uuid4())[:8],
+            name=f"Citizen_{i}",
+            position=Vector2D(x=25, y=25)
         )
-        city.add_entity(citizen)
+        city.add_agent(state)
+        agents.append(CitizenAgent(state))
 
-    print("--- AgentCity Simulation Starting ---")
-    
-    stop_event = asyncio.Event()
-    def ask_exit():
-        stop_event.set()
-
-    if sys.platform != "win32":
-        loop = asyncio.get_running_loop()
-        for s in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(s, ask_exit)
-    
-    simulation_task = asyncio.create_task(city.start())
+    print("--- AgentCity MVP Starting ---")
     
     try:
-        while not stop_event.is_set():
-            await asyncio.sleep(1)
-            if not city.running:
-                break
-    except (KeyboardInterrupt, asyncio.CancelledError):
-        pass
-    finally:
-        city.stop()
-        simulation_task.cancel()
-        try: await simulation_task
-        except asyncio.CancelledError: pass
-        print("\n--- AgentCity Simulation Stopped ---")
+        for tick in range(100):
+            await city.tick()
+            for agent in agents:
+                agent.decide_action(city)
+            
+            if tick % 10 == 0:
+                print(f"Tick {tick}: {len(city.agents)} agents active.")
+                for a in agents:
+                    print(f"  {a.state.name}: Pos({a.state.position.x},{a.state.position.y}) | Energy: {a.state.energy:.1f} | Balance: ${a.state.economy.balance}")
+            
+            await asyncio.sleep(0.1)
+    except KeyboardInterrupt:
+        print("Simulation stopped.")
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt: pass
+    asyncio.run(main())

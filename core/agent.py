@@ -1,70 +1,32 @@
 import random
-import logging
-from typing import Any, Optional, List
-from pydantic import PrivateAttr
-from .models import Entity, Position, Resource
-from .brain import SimpleBrain
+from core.models import AgentState, Vector2D, JobStatus
 
-logger = logging.getLogger("Agent")
+class CitizenAgent:
+    def __init__(self, state: AgentState):
+        self.state = state
 
-class Citizen(Entity):
-    goal: str = "explore"
-    kind: str = "agent"
-    _brain: Any = PrivateAttr()
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        self._brain = SimpleBrain(self)
-
-    async def update(self, world):
-        if not self.active:
-            return
-
-        # 1. Perception/Decision
-        nearby = world.get_nearby_entities(self.position, radius=10)
-        self.goal = await self._brain.decide(world, nearby)
-        
-        # 2. Action execution
-        dx, dy = 0, 0
-        if self.goal == "search_food":
-            # Target the first resource found
-            resources = [e for e in nearby if isinstance(e, Resource) and not e.depleted]
-            if resources:
-                target = resources[0].position
-            else:
-                target = Position(x=world.width // 2, y=world.height // 2)
-            
-            if self.position.x != target.x:
-                dx = 1 if target.x > self.position.x else -1
-            if self.position.y != target.y:
-                dy = 1 if target.y > self.position.y else -1
+    def decide_action(self, world):
+        """Basic AI logic for the MVP"""
+        if self.state.energy < 30:
+            self.move_towards(Vector2D(x=5, y=5)) # Head to Park
+        elif self.state.economy.balance < 10:
+            self.look_for_work(world)
         else:
-            # Wander
-            dx = random.choice([-1, 0, 1])
-            dy = random.choice([-1, 0, 1])
-        
-        new_x = max(0, min(world.width - 1, self.position.x + dx))
-        new_y = max(0, min(world.height - 1, self.position.y + dy))
-        self.position = Position(x=new_x, y=new_y)
-        
-        # 3. Consumption/Recovery
-        if self.goal == "search_food":
-            at_resource = [e for e in world.get_nearby_entities(self.position, radius=0) if isinstance(e, Resource) and not e.depleted]
-            if at_resource:
-                res = at_resource[0]
-                gain = min(res.value, 100.0 - self.energy)
-                self.energy += gain
-                # Simple depletion logic: resource loses value as consumed
-                res.value -= gain
-                if res.value <= 0:
-                    res.depleted = True
-                logger.info(f"{self.name} consumed {res.name} at {self.position}. Energy: {self.energy:.1f}")
+            self.wander()
 
-        # 4. State decay
-        decay_rate = 0.5 if self.goal == "search_food" else 0.2
-        self.energy -= decay_rate
-        
-        if self.energy <= 0:
-            self.energy = 0
-            self.active = False
-            logger.warning(f"{self.name} has collapsed from exhaustion.")
+    def move_towards(self, target: Vector2D):
+        if self.state.position.x < target.x: self.state.position.x += 1
+        elif self.state.position.x > target.x: self.state.position.x -= 1
+        if self.state.position.y < target.y: self.state.position.y += 1
+        elif self.state.position.y > target.y: self.state.position.y -= 1
+
+    def wander(self):
+        self.state.position.x = max(0, min(49, self.state.position.x + random.choice([-1, 0, 1])))
+        self.state.position.y = max(0, min(49, self.state.position.y + random.choice([-1, 0, 1])))
+
+    def look_for_work(self, world):
+        # Simple labor mechanic for MVP
+        zone = world.get_zone(self.state.position)
+        if zone == "market":
+            self.state.economy.balance += 5
+            self.state.energy -= 5

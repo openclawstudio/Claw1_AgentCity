@@ -1,76 +1,51 @@
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional
-from .models import Position, Entity
-from .config import settings
+from typing import Dict, List
+from core.models import AgentState, Vector2D, Transaction
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("World")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("WorldEngine")
+
+class Ledger:
+    def __init__(self):
+        self.history: List[Transaction] = []
+
+    def record(self, transaction: Transaction):
+        self.history.append(transaction)
+        logger.info(f"[TX] {transaction.sender_id} -> {transaction.receiver_id}: ${transaction.amount}")
 
 class World:
-    def __init__(self, width: int = None, height: int = None):
-        self.width = width or settings.WORLD_WIDTH
-        self.height = height or settings.WORLD_HEIGHT
-        self.entities: Dict[str, Entity] = {}
-        self.tick_rate = settings.TICK_RATE
-        self.running = False
-        self._tick_count = 0
+    def __init__(self, width: int = 50, height: int = 50):
+        self.width = width
+        self.height = height
+        self.tick_counter = 0
+        self.agents: Dict[str, AgentState] = {}
+        self.ledger = Ledger()
+        # Zoning: (x_range, y_range) -> ZoneType
+        self.zones = {
+            "park": {"x": range(0, 10), "y": range(0, 10), "bonus": "energy_regen"},
+            "market": {"x": range(20, 30), "y": range(20, 30), "bonus": "trade_hub"}
+        }
 
-    def add_entity(self, entity: Entity):
-        self.entities[entity.id] = entity
-        logger.info(f"Entity {entity.name} ({entity.id}) joined the world at {entity.position}")
+    def add_agent(self, agent_state: AgentState):
+        self.agents[agent_state.id] = agent_state
 
-    def remove_entity(self, entity_id: str):
-        if entity_id in self.entities:
-            del self.entities[entity_id]
+    def get_zone(self, pos: Vector2D):
+        for zone_name, data in self.zones.items():
+            if pos.x in data['x'] and pos.y in data['y']:
+                return zone_name
+        return "suburbs"
 
-    def get_nearby_entities(self, pos: Position, radius: int = 5) -> List[Entity]:
-        nearby = []
-        for e in self.entities.values():
-            if abs(e.position.x - pos.x) <= radius and abs(e.position.y - pos.y) <= radius:
-                nearby.append(e)
-        return nearby
-
-    async def start(self):
-        self.running = True
-        logger.info("World started.")
-        try:
-            while self.running:
-                await self.update()
-                self._tick_count += 1
-                if self._tick_count % 10 == 0:
-                    active_count = sum(1 for e in self.entities.values() if e.active)
-                    logger.info(f"World Heartbeat: Tick {self._tick_count} | Entities: {len(self.entities)} ({active_count} active)")
-                await asyncio.sleep(self.tick_rate)
-        except asyncio.CancelledError:
-            self.running = False
-            logger.info("World execution cancelled.")
-        except Exception as e:
-            logger.error(f"Critical World Error: {e}", exc_info=True)
-            self.running = False
-
-    async def update(self):
-        # Snapshot keys to avoid dictionary size change during iteration
-        entity_ids = list(self.entities.keys())
-        tasks = []
-        active_entities = []
-        
-        for eid in entity_ids:
-            entity = self.entities.get(eid)
-            if entity and entity.active:
-                tasks.append(entity.update(self))
-                active_entities.append(entity)
-        
-        if tasks:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for i, res in enumerate(results):
-                if isinstance(res, Exception):
-                    entity_name = active_entities[i].name if i < len(active_entities) else "Unknown"
-                    logger.error(f"Entity '{entity_name}' update error: {res}")
-
-    def stop(self):
-        self.running = False
-        logger.info("Stopping world...")
+    async def tick(self):
+        self.tick_counter += 1
+        for agent_id, state in self.agents.items():
+            # Apply Zone Effects
+            zone = self.get_zone(state.position)
+            if zone == "park":
+                state.energy = min(100, state.energy + 2)
+            
+            # Passive Energy Drain
+            state.energy -= 0.5
+            
+            if state.energy < 10:
+                logger.warning(f"Agent {agent_id} is exhausted!")
