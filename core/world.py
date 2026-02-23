@@ -33,7 +33,8 @@ class World:
         if agent_state.type == EntityType.BUSINESS:
             svc_type = agent_state.metadata.get("service_type")
             if svc_type in self.services:
-                self.services[svc_type].append(agent_state.id)
+                if agent_state.id not in self.services[svc_type]:
+                    self.services[svc_type].append(agent_state.id)
 
     def get_closest_service(self, pos: Vector2D, service_type: str) -> Optional[Vector2D]:
         service_ids = self.services.get(service_type, [])
@@ -80,11 +81,12 @@ class World:
         
         for agent_id, state in self.agents.items():
             zone = self.get_zone(state.position)
-            if zone == "park" and state.energy > 0:
+            # Apply environmental bonuses
+            if zone == "park" and state.energy < 100:
                 state.energy = min(100.0, state.energy + self.config.recovery_rate)
             
+            # Energy decay logic
             if state.energy > 0:
-                # Businesses decay energy slower or not at all (fixed structures for now)
                 decay = self.config.energy_decay / 2 if state.type == EntityType.BUSINESS else self.config.energy_decay
                 state.energy = max(0.0, state.energy - decay)
                 if state.energy <= 0 and state.type == EntityType.CITIZEN:
