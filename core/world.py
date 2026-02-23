@@ -21,10 +21,10 @@ class World:
         self.tick_counter = 0
         self.agents: Dict[str, AgentState] = {}
         self.ledger = Ledger()
-        # Zoning: (x_range, y_range) -> ZoneType
+        # Zoning: Defines spatial rules
         self.zones = {
-            "park": {"x": range(0, 10), "y": range(0, 10), "bonus": "energy_regen"},
-            "market": {"x": range(20, 30), "y": range(20, 30), "bonus": "trade_hub"}
+            "park": {"x": range(0, 11), "y": range(0, 11), "bonus": "energy_regen"},
+            "market": {"x": range(20, 31), "y": range(20, 31), "bonus": "trade_hub"}
         }
 
     def add_agent(self, agent_state: AgentState):
@@ -58,16 +58,18 @@ class World:
         return False
 
     async def tick(self):
+        """Advance the world state by one heartbeat."""
         self.tick_counter += 1
         for agent_id, state in self.agents.items():
             # Apply Zone Effects
             zone = self.get_zone(state.position)
-            if zone == "park":
-                state.energy = min(100.0, state.energy + 2.0)
+            if zone == "park" and state.energy > 0:
+                state.energy = min(100.0, state.energy + 3.0)
             
-            # Passive Energy Drain
-            state.energy -= 0.5
-            
-            if state.energy <= 0:
-                state.energy = 0
-                logger.warning(f"Agent {agent_id} is incapacitated!")
+            # Health check: Only active agents drain energy
+            if state.energy > 0:
+                state.energy -= 0.5
+                # Prevent negative energy
+                if state.energy < 0:
+                    state.energy = 0
+                    logger.warning(f"Agent {agent_id} ({state.name}) has collapsed from exhaustion.")
