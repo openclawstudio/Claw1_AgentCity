@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
 import uuid
 
@@ -22,7 +22,13 @@ class Entity(BaseModel):
     balance: float = 0.0
     metadata: Dict[str, Any] = Field(default_factory=dict)
     active: bool = True
+    kind: str = "entity"
 
     async def update(self, world: Any):
         """Base update logic for all entities"""
         pass
+
+class Resource(Entity):
+    kind: str = "resource"
+    value: float = 20.0
+    depleted: bool = False

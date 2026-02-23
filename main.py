@@ -4,29 +4,30 @@ import logging
 import sys
 from core.world import World
 from core.agent import Citizen
-from core.models import Position
+from core.models import Position, Resource
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("Main")
 
 async def main():
     city = World(width=50, height=50)
     
-    # Seed initial citizens
+    # Add static food sources (Resources)
+    food_source = Resource(name="Market", position=Position(x=25, y=25), value=30)
+    city.add_entity(food_source)
+    
+    # Seed citizens
     names = ["Alice", "Bob", "Charlie", "Dave"]
     for i, name in enumerate(names):
         citizen = Citizen(
             name=name, 
-            position=Position(x=20 + i, y=20 + i)
+            position=Position(x=10 + i*5, y=10 + i*5)
         )
         city.add_entity(citizen)
 
     print("--- AgentCity Simulation Starting ---")
     
-    # Cross-platform handling of shutdown
     stop_event = asyncio.Event()
-    
     def ask_exit():
         stop_event.set()
 
@@ -38,24 +39,20 @@ async def main():
     simulation_task = asyncio.create_task(city.start())
     
     try:
-        # Wait until stop event is triggered (e.g. by signal or energy exhaustion if implemented)
         while not stop_event.is_set():
             await asyncio.sleep(1)
-            if not city.running: # If world stopped internally
+            if not city.running:
                 break
     except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
         city.stop()
         simulation_task.cancel()
-        try:
-            await simulation_task
-        except asyncio.CancelledError:
-            pass
+        try: await simulation_task
+        except asyncio.CancelledError: pass
         print("\n--- AgentCity Simulation Stopped ---")
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except KeyboardInterrupt:
-        pass
+    except KeyboardInterrupt: pass

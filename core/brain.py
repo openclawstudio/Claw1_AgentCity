@@ -1,21 +1,20 @@
 import logging
-from typing import Any, Optional
+from typing import Any, List
 
 logger = logging.getLogger("Brain")
 
 class BaseBrain:
-    """
-    Abstract base for agent decision-making. 
-    Can be Hardcoded, Rule-based, or LLM-driven.
-    """
     def __init__(self, agent: Any):
         self.agent = agent
 
-    async def decide(self, world: Any) -> str:
+    async def decide(self, world: Any, nearby_entities: List[Any]) -> str:
         raise NotImplementedError("Brains must implement decide()")
 
 class SimpleBrain(BaseBrain):
-    async def decide(self, world: Any) -> str:
-        if self.agent.energy < 30:
+    async def decide(self, world: Any, nearby_entities: List[Any]) -> str:
+        # Check if hungry
+        if self.agent.energy < 40:
             return "search_food"
+        
+        # Logic to potentially interact with businesses (future phase)
         return "explore"
