@@ -1,26 +1,10 @@
 import random
-from typing import List, Dict
+from typing import List
 from .agent import Citizen
+from .entity import Business
 from .economy import Economy
 from .market import Marketplace
-from .models import Position, EntityType, BusinessState
-
-class Business:
-    def __init__(self, business_id: str, pos: Position, business_type: str):
-        self.state = BusinessState(id=business_id, pos=pos, business_type=business_type)
-        self.id = business_id
-
-    @property
-    def balance(self):
-        return self.state.balance
-
-    @balance.setter
-    def balance(self, value):
-        self.state.balance = value
-
-    @property
-    def business_type(self):
-        return self.state.business_type
+from .models import Position
 
 class AgentCityWorld:
     def __init__(self, width: int = 20, height: int = 20):
@@ -39,10 +23,15 @@ class AgentCityWorld:
 
     def add_business(self, business_id: str, business_type: str, x: int, y: int):
         biz = Business(business_id, Position(x=x, y=y), business_type)
+        # Give business some initial capital to pay workers
+        biz.balance = 500.0
         self.businesses.append(biz)
 
     def update(self):
         self.tick_count += 1
+        # Remove dead agents
+        self.agents = [a for a in self.agents if a.state.energy > 0]
+        
         for agent in self.agents:
             agent.step(self)
 

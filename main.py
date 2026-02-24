@@ -3,10 +3,13 @@ from core.world import AgentCityWorld
 
 def main():
     print("--- Starting AgentCity Simulation ---")
-    world = AgentCityWorld(width=10, height=10)
+    world = AgentCityWorld(width=15, height=15)
+    
+    # Setup Infrastructure
+    world.add_business("general_store", "grocery", 5, 5)
     
     # Spawn initial citizens
-    for i in range(5):
+    for i in range(8):
         world.spawn_agent(f"agent_{i}")
 
     try:
@@ -15,11 +18,15 @@ def main():
             status = world.get_status()
             print(f"Tick: {status['tick']} | Pop: {status['population']} | Treasury: {status['treasury']:.2f}")
             
-            if status['tick'] % 10 == 0:
-                for a in world.agents:
-                    print(f"  -> {a.id}: Energy {a.state.energy:.1f}, Balance {a.balance:.1f}")
+            if status['tick'] % 5 == 0:
+                for a in world.agents[:3]: # Monitor first few agents
+                    print(f"  -> {a.id}: Energy {a.state.energy:.1f}, Balance {a.balance:.1f}, Pos ({a.state.pos.x},{a.state.pos.y})")
             
-            time.sleep(1)
+            if status['population'] == 0:
+                print("All agents have perished. Simulation over.")
+                break
+
+            time.sleep(0.5)
     except KeyboardInterrupt:
         print("\nSimulation ended.")
 
