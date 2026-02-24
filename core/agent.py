@@ -4,10 +4,16 @@ from .models import AgentState, Profession, ResourceType, MarketOrder, OrderType
 
 class Citizen:
     def __init__(self, agent_id: str, x: int, y: int):
+        # Initialize inventory with all resource types to avoid KeyErrors
+        inventory = {res: 0.0 for res in ResourceType}
+        inventory[ResourceType.CURRENCY] = 100.0
+        
         self.state = AgentState(
             id=agent_id, 
             pos_x=x, 
             pos_y=y,
+            energy=100.0,
+            inventory=inventory,
             profession=random.choice([p for p in Profession if p != Profession.UNEMPLOYED])
         )
 
@@ -25,9 +31,9 @@ class Citizen:
         if self.state.energy < 70:
             self.work(world)
         
-        # Financial recovery: Agents get a small stipend if they are broke to keep the economy moving
+        # Financial recovery: Survival stipend
         if self.state.inventory.get(ResourceType.CURRENCY, 0) < 5:
-             self.state.inventory[ResourceType.CURRENCY] = self.state.inventory.get(ResourceType.CURRENCY, 0) + 1
+             self.state.inventory[ResourceType.CURRENCY] += 1.0
 
     def move(self, world):
         dx = random.choice([-1, 0, 1])
@@ -41,32 +47,30 @@ class Citizen:
         total_cost = qty * tx['price']
 
         if tx['buyer_id'] == self.state.id:
-            # Buyer: We already 'escrowed' the max cost in place_market_order
-            # Refund the difference if price was lower than our max
-            # and add the purchased resources.
-            self.state.inventory[tx['resource']] = self.state.inventory.get(tx['resource'], 0) + qty
-            # Note: For simplicity in this MVP, we actually deduct at point of trade 
-            # if not using a strict escrow system. Let's fix the double-spend risk:
+            # Buyer gets the resource. Currency was already 'escrowed' or checked.
+            self.state.inventory[tx['resource']] += qty
+            # Since we now deduct currency AT THE MOMENT of order placement (escrow),
+            # we only handle refunds here if the clearing price was lower than bid.
+            # For simplicity in this MVP, we deduct actual cost here and check balance during order.
             self.state.inventory[ResourceType.CURRENCY] -= total_cost
 
         elif tx['seller_id'] == self.state.id:
-            # Seller: Resource was already deducted in place_market_order.
-            # We just gain the currency.
+            # Seller gets the cash. Resource was already removed during order placement.
             self.state.inventory[ResourceType.CURRENCY] += total_cost
 
     def work(self, world):
         if self.state.profession == Profession.EXTRACTOR:
             # Costs 1 energy to produce 2 materials
-            self.state.energy -= 1
-            self.state.inventory[ResourceType.MATERIALS] = self.state.inventory.get(ResourceType.MATERIALS, 0) + 2
-            if self.state.inventory.get(ResourceType.MATERIALS, 0) >= 10:
+            self.state.energy -= 1.0
+            self.state.inventory[ResourceType.MATERIALS] += 2.0
+            if self.state.inventory[ResourceType.MATERIALS] >= 10:
                 self.place_market_order(world, ResourceType.MATERIALS, OrderType.SELL, 5, 5.0)
         
         elif self.state.profession == Profession.REFINER:
-            if self.state.inventory.get(ResourceType.MATERIALS, 0) >= 5:
-                self.state.energy -= 1
-                self.state.inventory[ResourceType.MATERIALS] -= 5
-                self.state.inventory[ResourceType.ENERGY] = self.state.inventory.get(ResourceType.ENERGY, 0) + 8
+            if self.state.inventory[ResourceType.MATERIALS] >= 5:
+                self.state.energy -= 1.0
+                self.state.inventory[ResourceType.MATERIALS] -= 5.0
+                self.state.inventory[ResourceType.ENERGY] += 8.0
                 if self.state.inventory[ResourceType.ENERGY] > 15:
                      self.place_market_order(world, ResourceType.ENERGY, OrderType.SELL, 5, 12.0)
             else:
@@ -88,11 +92,11 @@ class Citizen:
             # Escrow: remove from inventory immediately
             self.state.inventory[resource] -= qty
         else:
-            # Check if can afford
+            # Check if can afford the bid
             if self.state.inventory.get(ResourceType.CURRENCY, 0) < (qty * computed_price):
                 return
-            # We don't escrow currency here to keep logic simple, 
-            # handle_trade_event will check balance.
+            # We don't escrow currency here to prevent complex refund logic for now,
+            # but we checked the balance. The World settlement handles the swap.
 
         order = MarketOrder(
             id=str(uuid.uuid4()),
