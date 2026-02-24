@@ -3,6 +3,9 @@ import math
 from typing import Any, Optional, TYPE_CHECKING
 from .models import AgentState, Position, ResourceType
 
+if TYPE_CHECKING:
+    from .world import AgentCityWorld
+
 class Citizen:
     def __init__(self, agent_id: str, pos: Position):
         self.state = AgentState(id=agent_id, pos=pos)
@@ -16,27 +19,30 @@ class Citizen:
     def balance(self, value):
         self.state.balance = max(0.0, value)
 
-    def step(self, world: Any):
+    def step(self, world: 'AgentCityWorld'):
         """Advance the agent's state by one tick."""
         if self.state.energy <= 0:
             return
 
+        # Background energy drain
         self.state.energy -= 0.5
         
-        # Priority 1: Survival (Food)
+        # Priority 1: Survival (Food) - Threshold 30%
         if self.state.energy < 30:
             self._seek_resource(world, "food")
-        # Priority 2: Work (Money)
+        # Priority 2: Work (Money) - Threshold 20 Credits
         elif self.state.balance < 20:
             self._work(world)
-        # Priority 3: Idle
+        # Priority 3: Idle Wander
         else:
             self._wander(world)
 
     def _get_distance(self, pos1: Position, pos2: Position) -> float:
+        """Calculate Euclidean distance between two points."""
         return math.sqrt((pos1.x - pos2.x)**2 + (pos1.y - pos2.y)**2)
 
-    def _wander(self, world: Any):
+    def _wander(self, world: 'AgentCityWorld'):
+        """Random movement within world bounds."""
         directions = [(0,1), (0,-1), (1,0), (-1,0)]
         dx, dy = random.choice(directions)
         new_x = max(0, min(world.width - 1, self.state.pos.x + dx))
@@ -44,7 +50,8 @@ class Citizen:
         self.state.pos.x = new_x
         self.state.pos.y = new_y
 
-    def _seek_resource(self, world: Any, resource_type: str):
+    def _seek_resource(self, world: 'AgentCityWorld', resource_type: str):
+        """Find the nearest provider of a resource and consume it."""
         targets = [b for b in world.businesses if b.business_type == "grocery"]
         
         if not targets:
@@ -62,10 +69,12 @@ class Citizen:
         else:
             self._move_towards(nearest.pos)
 
-    def _work(self, world: Any):
+    def _work(self, world: 'AgentCityWorld'):
+        """Check job board and travel to workplace."""
         jobs = world.marketplace.get_available_jobs()
         
         if jobs:
+            # Simplistic job selection: first available
             job = jobs[0]
             employer = next((b for b in world.businesses if b.id == job.employer_id), None)
             if employer:
@@ -81,9 +90,8 @@ class Citizen:
         self._wander(world)
 
     def _move_towards(self, target_pos: Position):
-        # Improved movement: change both axes if needed
-        if self.state.pos.x < target_pos.x: self.state.pos.x += 1
-        elif self.state.pos.x > target_pos.x: self.state.pos.x -= 1
-        
-        if self.state.pos.y < target_pos.y: self.state.pos.y += 1
-        elif self.state.pos.y > target_pos.y: self.state.pos.y -= 1
+        """Step-wise movement towards a target coordinate on a grid (Orthogonal only)."""
+        if self.state.pos.x != target_pos.x:
+            self.state.pos.x += 1 if self.state.pos.x < target_pos.x else -1
+        elif self.state.pos.y != target_pos.y:
+            self.state.pos.y += 1 if self.state.pos.y < target_pos.y else -1
