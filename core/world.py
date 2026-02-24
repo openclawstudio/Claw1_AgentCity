@@ -1,34 +1,30 @@
+from .market import Market
+from .agent import Citizen
 import random
-from typing import Dict, List
-from .models import Position, ZoneType
 
-class Cell:
-    def __init__(self, x: int, y: int):
-        self.pos = Position(x=x, y=y)
-        self.zone = ZoneType.OPEN_SPACE
-        self.agents: List[str] = []
-
-class World:
-    def __init__(self, width: int, height: int):
+class CityWorld:
+    def __init__(self, width: int = 20, height: int = 20):
         self.width = width
         self.height = height
-        self.grid = [[Cell(x, y) for y in range(height)] for x in range(width)]
         self.ticks = 0
-        self._apply_zoning()
+        self.market = Market()
+        self.agents = []
 
-    def _apply_zoning(self):
-        # Simple procedural zoning for MVP
-        for x in range(self.width):
-            for y in range(self.height):
-                if x < self.width // 3:
-                    self.grid[x][y].zone = ZoneType.RESIDENTIAL
-                elif x < 2 * self.width // 3:
-                    self.grid[x][y].zone = ZoneType.COMMERCIAL
-                else:
-                    self.grid[x][y].zone = ZoneType.INDUSTRIAL
-
-    def get_cell(self, pos: Position) -> Cell:
-        return self.grid[pos.x][pos.y]
+    def spawn_agent(self):
+        agent = Citizen(
+            agent_id=f"agent_{len(self.agents)}",
+            x=random.randint(0, self.width-1),
+            y=random.randint(0, self.height-1)
+        )
+        self.agents.append(agent)
 
     def tick(self):
         self.ticks += 1
+        for agent in self.agents:
+            agent.step(self)
+        
+        return {
+            "tick": self.ticks,
+            "transactions": len(self.market.transaction_history),
+            "population": len(self.agents)
+        }

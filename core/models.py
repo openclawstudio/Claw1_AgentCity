@@ -2,40 +2,35 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from enum import Enum
 
-class ZoneType(str, Enum):
-    RESIDENTIAL = "residential"
-    COMMERCIAL = "commercial"
-    INDUSTRIAL = "industrial"
-    OPEN_SPACE = "open_space"
+class Profession(str, Enum):
+    UNEMPLOYED = "unemployed"
+    EXTRACTOR = "extractor"  # Gathers raw resources
+    REFINER = "refiner"      # Processes resources
+    MERCHANT = "merchant"    # Facilitates trade
 
 class ResourceType(str, Enum):
-    CURRENCY = "credits"
     ENERGY = "energy"
     MATERIALS = "materials"
-    FOOD = "food"
+    CURRENCY = "currency"
 
-class Position(BaseModel):
-    x: int
-    y: int
+class OrderType(str, Enum):
+    BUY = "buy"
+    SELL = "sell"
 
-class InventoryItem(BaseModel):
-    type: ResourceType
-    amount: float
-
-class Job(BaseModel):
+class MarketOrder(BaseModel):
     id: str
-    employer_id: str
-    title: str
-    payout: float
-    energy_cost: float
-    location: Position
-    completed: bool = False
+    agent_id: str
+    resource: ResourceType
+    order_type: OrderType
+    quantity: float
+    price: float
+    timestamp: int
 
 class AgentState(BaseModel):
     id: str
-    name: str
-    pos: Position
+    pos_x: int
+    pos_y: int
     energy: float = 100.0
-    balance: float = 0.0
-    inventory: List[InventoryItem] = []
-    current_goal: Optional[str] = None
+    inventory: Dict[ResourceType, float] = {ResourceType.CURRENCY: 100.0}
+    profession: Profession = Profession.UNEMPLOYED
+    goals: List[str] = []
