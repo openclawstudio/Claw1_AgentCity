@@ -19,8 +19,10 @@ class Market:
         sells = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.SELL], key=lambda x: x.price)
 
         for buy in buys:
+            if buy.quantity <= 0:
+                continue
             for sell in sells:
-                if buy.quantity <= 0 or sell.quantity <= 0 or buy.agent_id == sell.agent_id:
+                if sell.quantity <= 0 or buy.agent_id == sell.agent_id:
                     continue
                 
                 if buy.price >= sell.price:
@@ -43,9 +45,12 @@ class Market:
                     buy.quantity -= traded_qty
                     sell.quantity -= traded_qty
 
-        # Cleanup book
+                    if buy.quantity <= 0:
+                        break
+
+        # Cleanup book: Keep only orders with remaining quantity
         self.order_book[resource] = [
-            o for o in self.order_book[resource] if o.quantity > 0
+            o for o in self.order_book[resource] if o.quantity > 0.001
         ]
         
         if len(self.transaction_history) > 1000:
