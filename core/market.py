@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Optional
 from .models import MarketOrder, OrderType, ResourceType
 
 class Market:
@@ -58,10 +58,10 @@ class Market:
             o for o in self.order_book[resource] if o.quantity > 1e-6
         ]
         
-        # Rotate history
+        # Maintain history window
         if len(self.transaction_history) > 1000:
             self.transaction_history = self.transaction_history[-500:]
 
-    def get_average_price(self, resource: ResourceType, window: int = 10):
+    def get_average_price(self, resource: ResourceType, window: int = 10) -> Optional[float]:
         recent = [t['price'] for t in self.transaction_history if t['resource'] == resource][-window:]
         return sum(recent) / len(recent) if recent else None
