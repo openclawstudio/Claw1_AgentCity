@@ -31,3 +31,12 @@ class EconomySystem:
         agent.wallet += amount
         # Working costs energy
         agent.energy = max(0.0, agent.energy - 5.0)
+
+    @staticmethod
+    def consume_resource(agent: AgentState, item: str, energy_gain: float) -> bool:
+        """Agent consumes an item from inventory to regain energy."""
+        if agent.inventory.get(item, 0) >= 1:
+            agent.inventory[item] -= 1
+            agent.energy = min(100.0, agent.energy + energy_gain)
+            return True
+        return False

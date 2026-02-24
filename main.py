@@ -1,4 +1,5 @@
 import time
+import random
 from core.world import World
 from core.agent import CitizenAgent
 from core.models import Position, ZoneType
@@ -18,43 +19,53 @@ def run_simulation():
         CitizenAgent("a2", "Bob", Position(x=5, y=5)),
         CitizenAgent("a3", "Charlie", Position(x=9, y=9))
     ]
-    # Link world agents to the actual state objects
+    
+    # Setup initial state for a 'Merchant'
+    agents[1].state.inventory["energy_pack"] = 10
+    market.post_order(Order(agent_id="a2", item="energy_pack", price=15.0, order_type="sell"))
+
     world.agents = [a.state for a in agents]
 
     ticks = 0
     try:
         while ticks < 100:
             print(f"\n--- Tick {ticks} ---")
-            
-            # 1. World-level logic (environment factors)
             world.tick()
 
             for agent in agents:
-                # 2. Agent Decision logic
+                if agent.state.energy <= 0:
+                    print(f"{agent.state.name:7} | EXHAUSTED (Incapacitated)")
+                    continue
+
+                # 1. Decision logic
                 dx, dy = agent.decide_action(world)
-                
-                # 3. Apply movement
                 agent.apply_move(dx, dy, world_width, world_height)
                 
-                # 4. Interact with the environment based on new position
                 current_cell = world.get_cell(agent.state.pos)
                 
+                # 2. Zone-based interactions
                 if current_cell.zone == ZoneType.INDUSTRIAL:
-                    # Working provides currency but drains energy (processed in world.tick + here)
-                    EconomySystem.pay_wage(agent.state, 10.0)
+                    EconomySystem.pay_wage(agent.state, 12.0)
                     agent.state.last_action = "working"
                 
                 elif current_cell.zone == ZoneType.COMMERCIAL:
-                    # Try to buy 'rations' if wealthy
-                    if agent.state.wallet > 40:
-                        agent.state.last_action = "browsing_market"
-                        # Simulation of market interaction: Post an order if hungry
-                        if agent.state.energy < 50:
-                            match = market.find_match("energy_pack", 20.0)
-                            if match:
-                                # Logic for transaction would go here
-                                agent.state.last_action = "buying_resource"
-                
+                    # Try to maintain survival
+                    if agent.state.energy < 40 and agent.state.wallet >= 15:
+                        match = market.find_match("energy_pack", agent.state.wallet)
+                        if match:
+                            # Find the seller agent
+                            seller_agent = next((a for a in agents if a.state.id == match.agent_id), None)
+                            if seller_agent:
+                                success = EconomySystem.process_transaction(
+                                    agent.state, seller_agent.state, "energy_pack", match.price
+                                )
+                                if success:
+                                    EconomySystem.consume_resource(agent.state, "energy_pack", 30.0)
+                                    agent.state.last_action = "bought_and_consumed"
+                                    # If seller is out of stock, remove listing
+                                    if seller_agent.state.inventory.get("energy_pack", 0) <= 0:
+                                        market.remove_order(match.id)
+
                 status = (f"{agent.state.name:7} | "
                           f"Energy: {agent.state.energy:5.1f} | "
                           f"Wallet: {agent.state.wallet:5.1f} | "
@@ -64,7 +75,7 @@ def run_simulation():
                 print(status)
             
             ticks += 1
-            time.sleep(0.2)
+            time.sleep(0.1)
             
     except KeyboardInterrupt:
         print("\nSimulation stopped by user.")
@@ -73,5 +84,5 @@ def run_simulation():
         import traceback
         traceback.print_exc()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run_simulation()
