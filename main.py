@@ -1,47 +1,36 @@
 import time
-import random
+import os
 from core.world import World
-from core.agent import Agent
+from core.agent import CitizenAgent
 
-def main():
-    print("--- Starting AgentCity Simulation ---")
-    width, height = 10, 10
-    world = World(width=width, height=height)
+def run_simulation():
+    # Init City
+    city = World(width=20, height=20)
     
-    roles = ["worker", "merchant", "builder", "citizen", "producer"]
-    for i in range(15):
-        pos = (random.randint(0, width-1), random.randint(0, height-1))
-        role = roles[i % len(roles)]
-        a = Agent(f"agent_{i}", pos, job_role=role)
-        world.agents.append(a)
+    # Spawn Citizens
+    names = ["Alice", "Bob", "Charlie", "Dave", "Eve"]
+    for i, name in enumerate(names):
+        city.add_agent(CitizenAgent(f"agt-{i}", name, 10, 10))
 
-    print(f"Created {len(world.agents)} agents in a {width}x{height} world.")
-
+    print("--- AGENT CITY MVP STARTED ---")
     try:
-        for i in range(100):
-            world.step()
+        while True:
+            city.step()
+            summary = city.get_summary()
             
-            alive_agents = [a for a in world.agents if a.alive]
-            if not alive_agents:
-                print(f"Tick {i:03d} | All agents have perished.")
-                break
-
-            total_wealth = sum(a.state.wallet for a in alive_agents)
-            avg_energy = sum(a.state.energy for a in alive_agents) / len(alive_agents)
-            active_offers = len(world.market.offers)
+            # Clear screen for dashboard effect
+            os.system('cls' if os.name == 'nt' else 'clear')
+            print(f"City Heartbeat - Tick: {summary['tick']}")
+            print(f"Population: {summary['population']}")
+            print(f"Average Energy: {summary['avg_energy']}")
+            print("Market Prices (Credits):", {k.value: round(v, 2) for k, v in summary['market_prices'].items()})
+            print("\nCitizen Status:")
+            for a in city.agents:
+                print(f" - {a.state.name}: {a.state.status} | Energy: {round(a.state.energy_level, 1)} | Credits: {round(a.state.inventory.get('credits', 0), 1)}")
             
-            if i % 10 == 0:
-                print(f"Tick {i:03d} | Population: {len(alive_agents)} | Wealth: ${total_wealth:7.2f} | Avg Energy: {avg_energy:5.1f} | Market Offers: {active_offers}")
-            
-            time.sleep(0.05)
+            time.sleep(1)
     except KeyboardInterrupt:
-        print("\nSimulation stopped by user.")
-    
-    print("--- Final Stats ---")
-    print(f"Total Ticks: {world.tick_count}")
-    alive_final = [a for a in world.agents if a.alive]
-    print(f"Surviving Agents: {len(alive_final)}")
-    print(f"Total Economic Wealth: ${sum(a.state.wallet for a in alive_final):.2f}")
+        print("\nSimulation halted by user.")
 
 if __name__ == "__main__":
-    main()
+    run_simulation()

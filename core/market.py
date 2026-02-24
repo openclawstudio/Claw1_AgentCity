@@ -1,51 +1,22 @@
-import uuid
-from typing import List, Dict, Optional
-from .models import Offer
+from typing import Dict, List
+from core.models import ResourceType
 
 class Market:
     def __init__(self):
-        self.offers: Dict[str, Offer] = {}
+        self.prices = {
+            ResourceType.ENERGY: 10.0,
+            ResourceType.DATA: 15.0,
+            ResourceType.MATERIALS: 20.0
+        }
+        self.orders = []
 
-    def post_offer(self, agent_id: str, item: str, price: float, quantity: int, seller_inventory: Dict[str, int]) -> Optional[str]:
-        # Validation: Ensure agent actually has the items before posting
-        if seller_inventory.get(item, 0) < quantity:
-            return None
-            
-        offer_id = str(uuid.uuid4())
-        offer = Offer(id=offer_id, creator_id=agent_id, item=item, price=price, quantity=quantity)
-        self.offers[offer_id] = offer
-        return offer_id
+    def get_price(self, resource: ResourceType) -> float:
+        return self.prices.get(resource, 0.0)
 
-    def cleanup_stale_offers(self, alive_agent_ids: set):
-        """Remove offers from agents who are no longer alive."""
-        stale_ids = [
-            oid for oid, offer in self.offers.items()
-            if offer.creator_id not in alive_agent_ids
-        ]
-        for oid in stale_ids:
-            del self.offers[oid]
+    def post_job(self, agent_id: str, resource: ResourceType, reward: float):
+        self.orders.append({"issuer": agent_id, "type": resource, "reward": reward})
 
-    def fulfill_offer(self, offer_id: str, buyer, world_agents_map: dict, tick: int, economy) -> bool:
-        if offer_id not in self.offers:
-            return False
-        
-        offer = self.offers[offer_id]
-        seller = world_agents_map.get(offer.creator_id)
-        
-        # Prevent self-trading and validate seller existence/vitality
-        if not seller or not getattr(seller, 'alive', False) or seller.id == buyer.id:
-            self.offers.pop(offer_id, None)
-            return False
-
-        # Double check seller still has inventory
-        if seller.state.inventory.get(offer.item, 0) < offer.quantity:
-            self.offers.pop(offer_id, None)
-            return False
-
-        if buyer.state.wallet >= offer.price:
-            if economy.transfer(buyer, seller, offer.price, f"purchase_{offer.item}", tick):
-                seller.state.inventory[offer.item] -= offer.quantity
-                buyer.state.inventory[offer.item] = buyer.state.inventory.get(offer.item, 0) + offer.quantity
-                self.offers.pop(offer_id, None)
-                return True
-        return False
+    def update_prices(self):
+        # Basic volatility
+        for res in self.prices:
+            self.prices[res] *= 1.01 # Inflation simulation

@@ -1,31 +1,30 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Dict
 from enum import Enum
 
-class ZoneType(str, Enum):
-    RESIDENTIAL = "residential"
-    COMMERCIAL = "commercial"
-    INDUSTRIAL = "industrial"
-    EMPTY = "empty"
+class ResourceType(str, Enum):
+    ENERGY = "energy"
+    DATA = "data"
+    MATERIALS = "materials"
+    CREDITS = "credits"
 
-class Transaction(BaseModel):
-    sender_id: str
-    receiver_id: str
+class Position(BaseModel):
+    x: int
+    y: int
+
+class InventoryItem(BaseModel):
+    resource_type: ResourceType
     amount: float
-    purpose: str
-    timestamp: int
-
-class Offer(BaseModel):
-    id: str
-    creator_id: str
-    item: str
-    price: float
-    quantity: int
 
 class AgentState(BaseModel):
     id: str
-    pos: Tuple[int, int]
-    energy: float = 100.0
-    wallet: float = 50.0
-    job_role: Optional[str] = None
-    inventory: Dict[str, int] = {}
+    name: str
+    position: Position
+    inventory: Dict[ResourceType, float] = {}
+    energy_level: float = 100.0
+    status: str = "idle"
+
+class WorldState(BaseModel):
+    tick: int
+    agents: List[AgentState]
+    market_prices: Dict[ResourceType, float]
