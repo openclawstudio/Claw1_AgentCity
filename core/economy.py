@@ -1,4 +1,5 @@
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
+from .models import AgentState, BusinessState
 
 class EconomySystem:
     def __init__(self):
@@ -11,35 +12,33 @@ class EconomySystem:
         self.job_board.append(job)
         return job
 
-    def transfer(self, sender, receiver, amount: float) -> bool:
+    def transfer(self, sender: Union[AgentState, BusinessState], receiver: Union[AgentState, BusinessState], amount: float) -> bool:
         """
         Safely transfers funds between agents or businesses.
         Handles both AgentState (balance) and BusinessState (vault).
         """
-        # Determine sender balance
-        if hasattr(sender, "balance"):
-            s_bal = sender.balance
-        elif hasattr(sender, "vault"):
-            s_bal = sender.vault
-        else:
+        if amount <= 0:
             return False
 
+        # Determine sender balance
+        s_bal = getattr(sender, "balance", getattr(sender, "vault", 0.0))
+        
         if s_bal < amount:
             return False
 
-        # Deduct
+        # Deduct from sender
         if hasattr(sender, "balance"):
             sender.balance -= amount
         else:
             sender.vault -= amount
 
-        # Add
+        # Add to receiver
         if hasattr(receiver, "balance"):
             receiver.balance += amount
         elif hasattr(receiver, "vault"):
             receiver.vault += amount
         else:
-            # If receiver has no wallet, refund sender
+            # Refund if no wallet found
             if hasattr(sender, "balance"): sender.balance += amount
             else: sender.vault += amount
             return False

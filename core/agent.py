@@ -8,14 +8,14 @@ class Citizen:
 
     def step(self, world):
         """Executes one simulation step for the agent."""
-        # 1. Update Vitals
-        self.state.energy -= 1.0
-        
-        # 2. Decision Logic
         if self.state.energy <= 0:
             return
 
-        if self.state.energy < 30:
+        # 1. Update Vitals (Survival cost)
+        self.state.energy -= 0.8
+        
+        # 2. Decision Logic
+        if self.state.energy < 40:
             self._seek_energy(world)
         elif self.state.role == Role.CITIZEN and self.state.balance > 1000:
             self._become_entrepreneur(world)
@@ -36,7 +36,8 @@ class Citizen:
         self.state.pos = new_pos
 
     def _random_move(self, world):
-        dx, dy = random.choice([(0,1), (0,-1), (1,0), (-1,0)])
+        choices = [(0,1), (0,-1), (1,0), (-1,0), (0,0)]
+        dx, dy = random.choice(choices)
         new_x = max(0, min(world.width - 1, self.state.pos[0] + dx))
         new_y = max(0, min(world.height - 1, self.state.pos[1] + dy))
         self.state.pos = (new_x, new_y)
@@ -53,14 +54,14 @@ class Citizen:
         )
         
         if self.state.pos == target_biz.pos:
-            # Don't pay if you own the business
+            # Free energy if you own the business
             if target_biz.owner_id == self.state.id:
-                self.state.energy = min(100.0, self.state.energy + 40.0)
+                self.state.energy = min(100.0, self.state.energy + 50.0)
                 return
 
             owner = world.agents.get(target_biz.owner_id)
-            cost = 15.0
-            energy_gain = 40.0
+            cost = 20.0
+            energy_gain = 50.0
             
             # Target the owner's state or the business vault
             receiver = owner.state if owner else target_biz
@@ -68,13 +69,16 @@ class Citizen:
                 success = world.economy.transfer(self.state, receiver, cost)
                 if success:
                     self.state.energy = min(100.0, self.state.energy + energy_gain)
+            else:
+                # Can't afford energy, wander in despair
+                self._random_move(world)
         else:
             self._move_towards(world, target_biz.pos)
 
     def _become_entrepreneur(self, world):
-        setup_cost = 500.0
+        setup_cost = 600.0
         if self.state.balance >= setup_cost:
             self.state.balance -= setup_cost
             self.state.role = Role.ENTREPRENEUR
-            world.create_business(self.state.id, self.state.pos, "Energy Hub")
-            print(f"Agent {self.state.id} founded a business at {self.state.pos}")
+            biz = world.create_business(self.state.id, self.state.pos, "Energy Hub")
+            print(f">>> Agent {self.state.id} founded {biz.id} at {self.state.pos}")
