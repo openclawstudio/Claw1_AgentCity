@@ -31,12 +31,16 @@ class Citizen:
         self.state.pos.y = new_y
 
     def _seek_food(self, world):
-        # Logic: Find a provider and purchase food
         price = world.marketplace.resource_prices.get("food", 10.0)
-        if self.balance >= price:
-            # In a real simulation, this would be a transfer to a Business entity
+        # Seek the first food business as a simplified provider
+        provider = next((b for b in world.businesses if b.business_type == "grocery"), None)
+        
+        if provider and self.balance >= price:
+            if world.economy.transfer(self, provider, price, ResourceType.FOOD, world.tick_count):
+                self.state.energy += 40
+                print(f"Agent {self.id} bought food from {provider.id}. Energy: {self.state.energy:.1f}")
+        elif self.balance >= price:
+            # Fallback for system-level purchase if no business exists yet
             self.balance -= price
-            self.state.energy += 40
-            # Record tax if applicable via world economy later
             world.economy.treasury += price * world.economy.tax_rate
-            print(f"Agent {self.id} bought food. Energy: {self.state.energy:.1f}")
+            self.state.energy += 40

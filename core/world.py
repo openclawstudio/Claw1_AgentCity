@@ -1,3 +1,4 @@
+import random
 from typing import List, Dict
 from .agent import Citizen
 from .economy import Economy
@@ -9,7 +10,7 @@ class Business:
         self.id = business_id
         self.pos = pos
         self.business_type = business_type
-        self.vault = 0.0
+        self.balance = 0.0
 
 class AgentCityWorld:
     def __init__(self, width: int = 20, height: int = 20):
@@ -22,7 +23,7 @@ class AgentCityWorld:
         self.marketplace = Marketplace()
 
     def spawn_agent(self, agent_id: str):
-        pos = Position(x=random.randint(0, self.width-1), y=random.randint(0, self.height-1)) if 'random' in globals() else Position(x=self.width//2, y=self.height//2)
+        pos = Position(x=random.randint(0, self.width-1), y=random.randint(0, self.height-1))
         agent = Citizen(agent_id, pos)
         self.agents.append(agent)
 
@@ -42,5 +43,3 @@ class AgentCityWorld:
             "businesses": len(self.businesses),
             "treasury": self.economy.treasury
         }
-
-import random
