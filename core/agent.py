@@ -13,6 +13,9 @@ class CitizenAgent:
 
     def decide(self, economy: 'EconomySystem', buildings: List[Building], world_width: int, world_height: int):
         """Main decision logic based on internal utility."""
+        # Always ensure we aren't marked as inside a building if we aren't physically there
+        self._check_and_exit_buildings(buildings)
+
         if self.state.energy < 20:
             self.state.current_goal = "rest"
             self._seek_building(economy, buildings, BuildingType.HOME, world_width, world_height)
@@ -26,28 +29,29 @@ class CitizenAgent:
             self.state.current_goal = "explore"
             self._random_move(world_width, world_height)
 
+    def _check_and_exit_buildings(self, buildings: List[Building]):
+        """Ensures agent is removed from building occupant lists if not at building position."""
+        for b in buildings:
+            if self.state.id in b.occupants:
+                if b.pos.x != self.state.pos.x or b.pos.y != self.state.pos.y:
+                    b.exit(self.state.id)
+
     def _seek_building(self, economy: 'EconomySystem', buildings: List[Building], b_type: BuildingType, w: int, h: int):
         targets = [b for b in buildings if b.type == b_type]
         if not targets:
-            self.state.current_goal = "wandering (no targets)"
+            self.state.current_goal = f"wandering (no {b_type.value})"
             self._random_move(w, h)
             return
 
+        # Find nearest building of type
         target = min(targets, key=lambda b: abs(b.pos.x - self.state.pos.x) + abs(b.pos.y - self.state.pos.y))
         
         if self.state.pos.x == target.pos.x and self.state.pos.y == target.pos.y:
             if self.state.id not in target.occupants:
-                self._exit_all_buildings(buildings)
                 target.enter(self.state.id)
             self._perform_activity(economy, target)
         else:
-            self._exit_all_buildings(buildings)
             self._move_towards(target.pos)
-
-    def _exit_all_buildings(self, buildings: List[Building]):
-        for b in buildings:
-            if self.state.id in b.occupants:
-                b.exit(self.state.id)
 
     def _move_towards(self, target_pos: Position):
         if self.state.pos.x < target_pos.x: self.state.pos.x += 1
@@ -56,7 +60,6 @@ class CitizenAgent:
         if self.state.pos.y < target_pos.y: self.state.pos.y += 1
         elif self.state.pos.y > target_pos.y: self.state.pos.y -= 1
         
-        # Standard cost per move action
         self.state.energy = round(max(0.0, self.state.energy - 0.5), 2)
 
     def _random_move(self, w: int, h: int):
@@ -67,15 +70,15 @@ class CitizenAgent:
 
     def _perform_activity(self, economy: 'EconomySystem', building: Building):
         if building.type == BuildingType.HOME:
-            self.state.energy = min(100.0, self.state.energy + 20.0)
+            self.state.energy = round(min(100.0, self.state.energy + 20.0), 2)
         elif building.type == BuildingType.OFFICE:
             income = 15.0
-            self.state.wealth += income
-            self.state.energy = max(0.0, self.state.energy - 10.0)
+            self.state.wealth = round(self.state.wealth + income, 2)
+            self.state.energy = round(max(0.0, self.state.energy - 10.0), 2)
             economy.ledger.record("CITY_TREASURY", self.state.id, income, "salary")
         elif building.type == BuildingType.MARKET:
             cost = 10.0
             if self.state.wealth >= cost:
-                self.state.wealth -= cost
-                self.state.energy = min(100.0, self.state.energy + 40.0)
+                self.state.wealth = round(self.state.wealth - cost, 2)
+                self.state.energy = round(min(100.0, self.state.energy + 40.0), 2)
                 economy.ledger.record(self.state.id, "MARKET_OWNER", cost, "groceries")
