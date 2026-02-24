@@ -25,31 +25,36 @@ class CitizenAgent:
 
     def seek_energy(self, world):
         price = world.market.get_price(ResourceType.ENERGY)
-        credits = self.state.inventory.get(ResourceType.CREDITS, 0)
+        credits = self.state.inventory.get(ResourceType.CREDITS, 0.0)
         
         if credits >= price:
-            self.state.inventory[ResourceType.CREDITS] -= price
+            self.state.inventory[ResourceType.CREDITS] = credits - price
             self.state.energy_level += 25
             self.state.status = "refueling"
+            # Record in ledger and notify market for price dynamics
             world.economy.ledger.record(self.state.id, "market", ResourceType.ENERGY, 1, price)
+            world.market.transaction_event(ResourceType.ENERGY, is_buy=True)
         else:
             self.state.status = "broke/starving"
 
     def perform_activity(self, world):
         # Random movement for MVP spatial awareness
-        self.state.position.x = max(0, min(world.width - 1, self.state.position.x + random.randint(-1, 1)))
-        self.state.position.y = max(0, min(world.height - 1, self.state.position.y + random.randint(-1, 1)))
+        dx, dy = random.randint(-1, 1), random.randint(-1, 1)
+        self.state.position.x = max(0, min(world.width - 1, self.state.position.x + dx))
+        self.state.position.y = max(0, min(world.height - 1, self.state.position.y + dy))
         
-        # Opportunity to 'work' and earn credits/materials
+        # Opportunity to 'work' and earn credits
         if random.random() > 0.7:
             self.state.status = "working"
             reward = world.economy.work_reward
-            self.state.inventory[ResourceType.CREDITS] = self.state.inventory.get(ResourceType.CREDITS, 0) + reward
+            self.state.inventory[ResourceType.CREDITS] = self.state.inventory.get(ResourceType.CREDITS, 0.0) + reward
+            # Work produces 'data' for the market
+            world.market.transaction_event(ResourceType.DATA, is_buy=False)
         else:
             self.state.status = "exploring"
 
     def try_recover(self, world):
         # Exhausted agents gain a tiny bit of energy per tick until they can act again
-        self.state.energy_level += 0.1
-        if self.state.energy_level > 5:
+        self.state.energy_level += 1.0
+        if self.state.energy_level > 20:
             self.state.status = "idle"
