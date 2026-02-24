@@ -38,3 +38,10 @@ class AgentState(BaseModel):
     balance: float = 50.0
     inventory: Dict[str, float] = {}
     profession: Optional[str] = None
+
+class BusinessState(BaseModel):
+    id: str
+    pos: Position
+    business_type: str
+    balance: float = 0.0
+    employees: List[str] = []

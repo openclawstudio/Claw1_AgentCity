@@ -3,14 +3,24 @@ from typing import List, Dict
 from .agent import Citizen
 from .economy import Economy
 from .market import Marketplace
-from .models import Position, EntityType
+from .models import Position, EntityType, BusinessState
 
 class Business:
     def __init__(self, business_id: str, pos: Position, business_type: str):
+        self.state = BusinessState(id=business_id, pos=pos, business_type=business_type)
         self.id = business_id
-        self.pos = pos
-        self.business_type = business_type
-        self.balance = 0.0
+
+    @property
+    def balance(self):
+        return self.state.balance
+
+    @balance.setter
+    def balance(self, value):
+        self.state.balance = value
+
+    @property
+    def business_type(self):
+        return self.state.business_type
 
 class AgentCityWorld:
     def __init__(self, width: int = 20, height: int = 20):

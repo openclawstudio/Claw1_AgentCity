@@ -32,15 +32,15 @@ class Citizen:
 
     def _seek_food(self, world):
         price = world.marketplace.resource_prices.get("food", 10.0)
-        # Seek the first food business as a simplified provider
+        # Seek business
         provider = next((b for b in world.businesses if b.business_type == "grocery"), None)
         
-        if provider and self.balance >= price:
+        if provider:
             if world.economy.transfer(self, provider, price, ResourceType.FOOD, world.tick_count):
                 self.state.energy += 40
                 print(f"Agent {self.id} bought food from {provider.id}. Energy: {self.state.energy:.1f}")
         elif self.balance >= price:
-            # Fallback for system-level purchase if no business exists yet
+            # Public vendor (fallback)
             self.balance -= price
-            world.economy.treasury += price * world.economy.tax_rate
+            world.economy.treasury += price # No net loss to system, behaves as universal store
             self.state.energy += 40
