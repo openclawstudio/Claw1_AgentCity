@@ -1,34 +1,21 @@
-import uuid
-from typing import List, Dict, Any
-from datetime import datetime
-from core.models import Transaction
-
-class TransactionLedger:
-    def __init__(self):
-        self.history: List[Transaction] = []
-
-    def record(self, sender: str, receiver: str, amount: float, purpose: str):
-        tx = Transaction(
-            id=str(uuid.uuid4()),
-            sender_id=sender,
-            receiver_id=receiver,
-            amount=amount,
-            purpose=purpose,
-            timestamp=datetime.now().isoformat()
-        )
-        self.history.append(tx)
-        return tx
+from typing import Dict, List
+from .models import InventoryItem
 
 class EconomySystem:
     def __init__(self):
-        self.ledger = TransactionLedger()
-        self.registry: Dict[str, List[str]] = {} # service_name -> [agent_ids]
+        self.total_money_supply = 0.0
+        self.transaction_history = []
+        self.job_board = []
 
-    def register_service(self, agent_id: str, service_name: str):
-        if service_name not in self.registry:
-            self.registry[service_name] = []
-        if agent_id not in self.registry[service_name]:
-            self.registry[service_name].append(agent_id)
+    def post_job(self, business_id: str, title: str, wage: float):
+        job = {"business_id": business_id, "title": title, "wage": wage, "active": True}
+        self.job_board.append(job)
+        return job
 
-    def get_providers(self, service_name: str) -> List[str]:
-        return self.registry.get(service_name, [])
+    def transfer(self, sender, receiver, amount: float):
+        if sender.balance >= amount:
+            sender.balance -= amount
+            receiver.balance += amount
+            self.transaction_history.append({"from": sender.id, "to": receiver.id, "amount": amount})
+            return True
+        return False

@@ -1,35 +1,27 @@
-from typing import List
-from core.agent import CitizenAgent
-from core.entity import Building, BuildingType
-from core.models import Position
-from core.economy import EconomySystem
+import random
+from .agent import Citizen
+from .economy import EconomySystem
 
-class AgentCityWorld:
+class World:
     def __init__(self, width: int = 20, height: int = 20):
         self.width = width
         self.height = height
-        self.agents: List[CitizenAgent] = []
-        self.buildings: List[Building] = []
+        self.agents = {}
+        self.businesses = {}
         self.economy = EconomySystem()
         self.tick_counter = 0
 
-    def add_agent(self, agent: CitizenAgent):
-        self.agents.append(agent)
+    def spawn_agent(self):
+        x, y = random.randint(0, self.width-1), random.randint(0, self.height-1)
+        agent_id = f"agent_{len(self.agents)}"
+        agent = Citizen(agent_id, x, y)
+        self.agents[agent_id] = agent
+        return agent
 
-    def add_building(self, building: Building):
-        # Ensure building is within bounds
-        building.pos.x = max(0, min(self.width - 1, building.pos.x))
-        building.pos.y = max(0, min(self.height - 1, building.pos.y))
-        self.buildings.append(building)
-
-    def step(self):
+    def tick(self):
         self.tick_counter += 1
-        for agent in self.agents:
-            agent.decide(self.economy, self.buildings, self.width, self.height)
-
-    def get_status(self):
-        return {
-            "tick": self.tick_counter,
-            "population": len(self.agents),
-            "economic_activity": len(self.economy.ledger.history)
-        }
+        for agent in self.agents.values():
+            agent.step(self)
+        
+        if self.tick_counter % 10 == 0:
+            print(f"--- Tick {self.tick_counter} | Agents: {len(self.agents)} | Total Economy: {sum(a.state.balance for a in self.agents.values())} credits ---")

@@ -1,23 +1,36 @@
-from pydantic import BaseModel
-from typing import List, Optional, Tuple
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict
+from enum import Enum
 
-class Position(BaseModel):
-    x: int
-    y: int
+class Role(str, Enum):
+    CITIZEN = "citizen"
+    ENTREPRENEUR = "entrepreneur"
+    WORKER = "worker"
+    GOVERNMENT = "government"
 
-class Transaction(BaseModel):
-    id: str
-    sender_id: str
-    receiver_id: str
-    amount: float
-    purpose: str
-    timestamp: str
+class ResourceType(str, Enum):
+    ENERGY = "energy"
+    CREDITS = "credits"
+    MATERIALS = "materials"
+
+class InventoryItem(BaseModel):
+    name: str
+    quantity: float
+    unit_price: Optional[float] = 0.0
 
 class AgentState(BaseModel):
     id: str
-    name: str
-    pos: Position
+    pos: tuple[int, int]
+    role: Role = Role.CITIZEN
     energy: float = 100.0
-    wealth: float = 50.0
-    inventory: List[str] = []
-    current_goal: Optional[str] = "idle"
+    balance: float = 500.0
+    inventory: List[InventoryItem] = []
+    memory: List[str] = []
+
+class BusinessState(BaseModel):
+    id: str
+    owner_id: str
+    pos: tuple[int, int]
+    business_type: str
+    employees: List[str] = []
+    vault: float = 0.0
