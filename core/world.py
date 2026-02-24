@@ -19,18 +19,26 @@ class World:
     def _initialize_zones(self):
         for x in range(self.width):
             for y in range(self.height):
-                # Procedural zoning
-                if (x + y) % 7 == 0:
+                # Deterministic but varied zoning
+                val = (x * 3 + y * 7)
+                if val % 10 == 0:
                     zt = ZoneType.COMMERCIAL
-                elif (x * y) % 11 == 0:
+                elif val % 10 == 1:
                     zt = ZoneType.INDUSTRIAL
+                elif val % 10 in [2, 3]:
+                    zt = ZoneType.OPEN_SPACE
                 else:
                     zt = ZoneType.RESIDENTIAL
                 
                 self.set_zone(x, y, zt)
+        
+        # Safety check: Ensure at least one of each critical zone exists
+        for zt in [ZoneType.RESIDENTIAL, ZoneType.COMMERCIAL, ZoneType.INDUSTRIAL]:
+            if not self._zone_cache[zt]:
+                rx, ry = random.randint(0, self.width-1), random.randint(0, self.height-1)
+                self.set_zone(rx, ry, zt)
 
     def set_zone(self, x: int, y: int, zone_type: ZoneType):
-        """Sets a zone and updates internal caches."""
         old_zone = self.grid.get((x, y))
         if old_zone == zone_type:
             return
@@ -47,9 +55,9 @@ class World:
     def get_nearest_zone(self, pos: Position, zone_type: ZoneType) -> Position:
         coords = self._zone_cache.get(zone_type, [])
         if not coords:
-            return pos
+            # Fallback to random if no zone exists (should not happen with safety check)
+            return Position(x=random.randint(0, self.width-1), y=random.randint(0, self.height-1))
         
-        # Find nearest coordinate using Manhattan distance
         best_coord = min(coords, key=lambda c: abs(c[0] - pos.x) + abs(c[1] - pos.y))
         return Position(x=best_coord[0], y=best_coord[1])
 
@@ -61,7 +69,6 @@ class World:
 
     def step(self):
         self.tick_counter += 1
-        # Agents act in random order to ensure fairness in the micro-economy
         agent_list = list(self.agents.values())
         random.shuffle(agent_list)
         for agent in agent_list:

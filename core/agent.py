@@ -3,16 +3,15 @@ from core.models import Position, AgentState, Transaction, ZoneType
 from core.brain import Brain
 
 class Citizen:
-    # Simulation constants for balancing
     ENERGY_DECAY = 0.5
-    WORK_REWARD = 12.0
-    WORK_COST = 5.0
-    REST_RECOVERY = 20.0
+    WORK_REWARD = 15.0
+    WORK_COST = 8.0
+    REST_RECOVERY = 25.0
     SOCIAL_COST = 5.0
-    SOCIAL_REWARD = 15.0
+    SOCIAL_REWARD = 20.0
 
     def __init__(self, name: str, x: int, y: int):
-        self.id = str(uuid.uuid4())
+        self.id = str(uuid.uuid4())[:8]  # Short ID for display
         self.name = name
         self.pos = Position(x=x, y=y)
         self.state = AgentState()
@@ -25,25 +24,28 @@ class Citizen:
         # 2. Identify target
         target = self.brain.get_target_position(action, self.pos, world)
         
-        # 3. Move towards target (if not already there)
+        # 3. Move
         if self.pos != target:
             self._move_towards(target)
         else:
-            # 4. Interact if arrived
+            # 4. Act
             current_zone = world.get_zone(self.pos)
             self._process_zone_effects(current_zone, world)
         
         # 5. Natural State Decay
         self.state.energy = max(0.0, self.state.energy - self.ENERGY_DECAY)
         if self.state.energy <= 0:
-            self.state.happiness = max(0.0, self.state.happiness - 1.0)
+            self.state.happiness = max(0.0, self.state.happiness - 2.0)
 
     def _move_towards(self, target: Position):
-        # Simple Manhattan movement
+        # Update coordinates maintaining Pydantic integrity
+        new_x, new_y = self.pos.x, self.pos.y
         if self.pos.x != target.x:
-            self.pos.x += 1 if target.x > self.pos.x else -1
+            new_x += 1 if target.x > self.pos.x else -1
         elif self.pos.y != target.y:
-            self.pos.y += 1 if target.y > self.pos.y else -1
+            new_y += 1 if target.y > self.pos.y else -1
+        
+        self.pos = Position(x=new_x, y=new_y)
 
     def _process_zone_effects(self, zone, world):
         if zone == ZoneType.INDUSTRIAL:
