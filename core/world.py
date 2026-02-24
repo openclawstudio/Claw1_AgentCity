@@ -19,16 +19,27 @@ class World:
     def _initialize_zones(self):
         for x in range(self.width):
             for y in range(self.height):
-                # Basic procedural zoning
-                if (x + y) % 5 == 0:
+                # Procedural zoning
+                if (x + y) % 7 == 0:
                     zt = ZoneType.COMMERCIAL
-                elif (x * y) % 4 == 0:
+                elif (x * y) % 11 == 0:
                     zt = ZoneType.INDUSTRIAL
                 else:
                     zt = ZoneType.RESIDENTIAL
                 
-                self.grid[(x, y)] = zt
-                self._zone_cache[zt].append((x, y))
+                self.set_zone(x, y, zt)
+
+    def set_zone(self, x: int, y: int, zone_type: ZoneType):
+        """Sets a zone and updates internal caches."""
+        old_zone = self.grid.get((x, y))
+        if old_zone == zone_type:
+            return
+        
+        if old_zone and (x, y) in self._zone_cache[old_zone]:
+            self._zone_cache[old_zone].remove((x, y))
+            
+        self.grid[(x, y)] = zone_type
+        self._zone_cache[zone_type].append((x, y))
 
     def get_zone(self, pos: Position) -> ZoneType:
         return self.grid.get((pos.x, pos.y), ZoneType.OPEN_SPACE)
@@ -50,6 +61,8 @@ class World:
 
     def step(self):
         self.tick_counter += 1
-        # Use a list to avoid dictionary mutation issues during iteration if agents are added/removed
-        for agent in list(self.agents.values()):
+        # Agents act in random order to ensure fairness in the micro-economy
+        agent_list = list(self.agents.values())
+        random.shuffle(agent_list)
+        for agent in agent_list:
             agent.step(self)
