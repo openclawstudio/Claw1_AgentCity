@@ -23,6 +23,11 @@ class EconomyEngine:
     def process_consumption(self, agent_state: AgentState):
         multiplier = 1.2 if agent_state.status == "working" else 1.0
         usage = self.base_consumption * multiplier
-        agent_state.energy_level = max(0, agent_state.energy_level - usage)
+        agent_state.energy_level = max(0.0, agent_state.energy_level - usage)
         if agent_state.energy_level <= 0:
             agent_state.status = "exhausted"
+
+    def process_work_reward(self, agent_state: AgentState):
+        """Standardizes how agents are rewarded for general city labor."""
+        agent_state.inventory[ResourceType.CREDITS] += self.work_reward
+        agent_state.inventory[ResourceType.DATA] += 0.5
