@@ -6,24 +6,27 @@ class Brain:
         self.memory = []
 
     def decide_action(self, state, world):
-        # Simple heuristic decision making
+        # Simple heuristic decision making based on needs
         if state.energy < 30:
-            return "seek_rest" # Residential
+            return "rest"
         elif state.wallet.balance < 10:
-            return "seek_work" # Industrial
+            return "work"
         else:
-            return "socialize" # Commercial
+            return "socialize"
 
     def get_target_position(self, action, current_pos, world):
-        target_zone = ZoneType.RESIDENTIAL
-        if action == "seek_work":
-            target_zone = ZoneType.INDUSTRIAL
-        elif action == "socialize":
-            target_zone = ZoneType.COMMERCIAL
+        # Map actions to ZoneTypes
+        action_map = {
+            "rest": ZoneType.RESIDENTIAL,
+            "work": ZoneType.INDUSTRIAL,
+            "socialize": ZoneType.COMMERCIAL
+        }
+        target_zone = action_map.get(action, ZoneType.RESIDENTIAL)
 
-        # Find nearest zone of type
+        # Find nearest zone of type using Manhattan distance
         best_pos = current_pos
         min_dist = float('inf')
+        found = False
         
         for coord, zone in world.grid.items():
             if zone == target_zone:
@@ -31,5 +34,6 @@ class Brain:
                 if dist < min_dist:
                     min_dist = dist
                     best_pos = Position(x=coord[0], y=coord[1])
+                    found = True
         
-        return best_pos
+        return best_pos if found else current_pos
