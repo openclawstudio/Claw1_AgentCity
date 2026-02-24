@@ -2,6 +2,7 @@ import random
 from typing import Dict, Tuple, List, Optional
 from .models import ZoneType
 from .economy import EconomyManager
+
 from .market import Market
 
 class World:
@@ -38,7 +39,7 @@ class World:
         self.agent_map = {a.id: a for a in self.agents if a.alive}
         
         # 2. Cleanup market (remove offers from dead agents)
-        self.market.cleanup_stale_offers(self.agent_map)
+        self.market.cleanup_stale_offers(set(self.agent_map.keys()))
         
         # 3. Perform actions
         for agent in self.agents:

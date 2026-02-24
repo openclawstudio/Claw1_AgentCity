@@ -16,11 +16,11 @@ class Market:
         self.offers[offer_id] = offer
         return offer_id
 
-    def cleanup_stale_offers(self, world_agents_map: dict):
-        """Remove offers from agents who are no longer alive or present."""
+    def cleanup_stale_offers(self, alive_agent_ids: set):
+        """Remove offers from agents who are no longer alive."""
         stale_ids = [
             oid for oid, offer in self.offers.items()
-            if offer.creator_id not in world_agents_map or not world_agents_map[offer.creator_id].alive
+            if offer.creator_id not in alive_agent_ids
         ]
         for oid in stale_ids:
             del self.offers[oid]
@@ -32,8 +32,8 @@ class Market:
         offer = self.offers[offer_id]
         seller = world_agents_map.get(offer.creator_id)
         
-        # Prevent self-trading and validate seller existence
-        if not seller or not seller.alive or seller.id == buyer.id:
+        # Prevent self-trading and validate seller existence/vitality
+        if not seller or not getattr(seller, 'alive', False) or seller.id == buyer.id:
             self.offers.pop(offer_id, None)
             return False
 
