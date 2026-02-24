@@ -17,12 +17,15 @@ class AgentCityWorld:
         self.agents.append(agent)
 
     def add_building(self, building: Building):
+        # Ensure building is within bounds
+        building.pos.x = max(0, min(self.width - 1, building.pos.x))
+        building.pos.y = max(0, min(self.height - 1, building.pos.y))
         self.buildings.append(building)
 
     def step(self):
         self.tick_counter += 1
         for agent in self.agents:
-            agent.decide(self.economy, self.buildings)
+            agent.decide(self.economy, self.buildings, self.width, self.height)
 
     def get_status(self):
         return {

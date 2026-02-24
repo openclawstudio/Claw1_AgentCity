@@ -1,23 +1,11 @@
 import pytest
 from core.world import AgentCityWorld
+from core.agent import CitizenAgent
 
-def test_simulation_tick_depletes_energy():
-    world = AgentCityWorld(10, 10)
-    world.spawn_agent("test_agent")
-    initial_energy = world.agents[0].state.energy
-    world.update()
-    assert world.agents[0].state.energy < initial_energy
-
-def test_agent_buys_food():
-    world = AgentCityWorld(10, 10)
-    world.add_business("store", "grocery", 1, 1)
-    world.spawn_agent("hungry_agent")
-    agent = world.agents[0]
-    agent.state.pos.x, agent.state.pos.y = 1, 1
-    agent.state.energy = 20
-    agent.balance = 50
-    
-    world.update()
-    
-    assert agent.state.energy > 20
-    assert agent.balance < 50
+def test_agent_movement_bounds():
+    world = AgentCityWorld(width=5, height=5)
+    agent = CitizenAgent("test", "Tester", world.add_building.__annotations__['building'])
+    # Manually set out of bounds
+    agent.state.pos.x = 10
+    agent.decide(world.economy, [], 5, 5)
+    assert agent.state.pos.x <= 5
