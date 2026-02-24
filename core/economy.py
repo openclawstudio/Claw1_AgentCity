@@ -1,35 +1,28 @@
-from typing import List, Dict
-import uuid
+from typing import List
+from .models import Transaction, ResourceType
 
-class Ledger:
+class Economy:
     def __init__(self):
-        self.transactions: List[Dict] = []
+        self.transaction_history: List[Transaction] = []
+        self.tax_rate = 0.05
+        self.treasury = 0.0
 
-    def record(self, sender: str, receiver: str, amount: float, purpose: str):
-        entry = {
-            "id": str(uuid.uuid4()),
-            "sender": sender,
-            "receiver": receiver,
-            "amount": amount,
-            "purpose": purpose
-        }
-        self.transactions.append(entry)
-        return entry
-
-class EconomyManager:
-    def __init__(self):
-        self.ledger = Ledger()
-        self.global_gdp = 0.0
-
-    def record_payout(self, employer_id: str, employee_id: str, amount: float, title: str):
-        """Centralized method to handle job payouts and GDP tracking."""
-        self.global_gdp += amount
-        return self.ledger.record(employer_id, employee_id, amount, f"Job: {title}")
-
-    def transfer(self, sender_agent, receiver_agent, amount: float, reason: str):
-        if sender_agent.balance >= amount:
-            sender_agent.balance -= amount
-            receiver_agent.balance += amount
-            self.global_gdp += amount
-            return self.ledger.record(sender_agent.id, receiver_agent.id, amount, reason)
-        return None
+    def transfer(self, sender, receiver, amount: float, resource: ResourceType, tick: int) -> bool:
+        if sender.balance >= amount:
+            tax = amount * self.tax_rate
+            net_amount = amount - tax
+            
+            sender.balance -= amount
+            receiver.balance += net_amount
+            self.treasury += tax
+            
+            tx = Transaction(
+                sender_id=sender.id, 
+                receiver_id=receiver.id, 
+                amount=amount, 
+                resource_type=resource, 
+                timestamp=tick
+            )
+            self.transaction_history.append(tx)
+            return True
+        return False
