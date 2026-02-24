@@ -1,25 +1,33 @@
-from typing import Dict
+from typing import Dict, Optional
 from .models import AgentState, ResourceType
 
 class EconomySystem:
     TAX_RATE = 0.05
     
     @staticmethod
-    def process_transaction(buyer: AgentState, seller: AgentState, amount: float, item: str):
-        # Ensure seller has the item and buyer has the funds
+    def process_transaction(buyer: AgentState, seller: AgentState, item: str, price: float) -> bool:
+        """Executes a trade between two agents."""
+        if buyer.wallet < price:
+            return False
+        
         seller_stock = seller.inventory.get(item, 0)
-        if buyer.wallet >= amount and seller_stock > 0:
-            buyer.wallet -= amount
-            seller.wallet += amount * (1 - EconomySystem.TAX_RATE)
+        if seller_stock <= 0:
+            return False
             
-            # Update inventory
-            buyer.inventory[item] = buyer.inventory.get(item, 0) + 1
-            seller.inventory[item] = seller_stock - 1
-            return True
-        return False
+        # Exchange currency
+        buyer.wallet -= price
+        tax = price * EconomySystem.TAX_RATE
+        seller.wallet += (price - tax)
+        
+        # Exchange goods
+        seller.inventory[item] = seller_stock - 1
+        buyer.inventory[item] = buyer.inventory.get(item, 0) + 1
+        
+        return True
 
     @staticmethod
     def pay_wage(agent: AgentState, amount: float):
+        """Standardized wage payment for labor."""
         agent.wallet += amount
-        # Working costs energy, but don't drop below zero
-        agent.energy = max(0.0, agent.energy - 10.0)
+        # Working costs energy
+        agent.energy = max(0.0, agent.energy - 5.0)
