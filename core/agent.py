@@ -24,6 +24,10 @@ class CitizenAgent:
             self.try_recover()
             return
 
+        # Reset status for new tick unless specialized
+        if self.state.status not in ["exhausted", "broke"]:
+            self.state.status = "idle"
+
         # 1. Metabolism
         world.economy.process_consumption(self.state)
 
@@ -41,28 +45,28 @@ class CitizenAgent:
             self.state.inventory[ResourceType.CREDITS] -= price
             self.state.energy_level = min(100.0, self.state.energy_level + 25)
             self.state.status = "refueling"
+            # Record: Agent pays Market for Energy
             world.economy.ledger.record(self.state.id, "market", ResourceType.ENERGY, 1, price)
             world.market.transaction_event(ResourceType.ENERGY, is_buy=True)
         else:
             self.state.status = "broke"
 
     def perform_activity(self, world: 'World'):
-        # Spatial logic
         self.move_randomly(world)
         
-        # Economic logic
+        # Economic logic: Work and Trade
         if random.random() > 0.7:
-            # Use economy engine to handle rewards consistently
             world.economy.apply_work_effects(self.state)
             
-            # Market interaction logic
+            # Sell surplus data
             if self.state.inventory[ResourceType.DATA] >= 5:
                 sell_price = world.market.get_price(ResourceType.DATA) * 0.8
                 qty = 5
                 self.state.inventory[ResourceType.CREDITS] += (sell_price * qty)
                 self.state.inventory[ResourceType.DATA] -= qty
                 world.market.transaction_event(ResourceType.DATA, is_buy=False)
-                world.economy.ledger.record("market", self.state.id, ResourceType.DATA, qty, sell_price)
+                # Record: Agent sells to Market
+                world.economy.ledger.record(self.state.id, "market", ResourceType.DATA, qty, sell_price)
         else:
             self.state.status = "exploring"
 
@@ -70,10 +74,9 @@ class CitizenAgent:
         dx, dy = random.randint(-1, 1), random.randint(-1, 1)
         new_x = max(0, min(world.width - 1, self.state.position.x + dx))
         new_y = max(0, min(world.height - 1, self.state.position.y + dy))
-        self.state.position.x = new_x
-        self.state.position.y = new_y
+        self.state.position = Position(x=new_x, y=new_y)
 
     def try_recover(self):
-        self.state.energy_level += 2.0
+        self.state.energy_level += 5.0
         if self.state.energy_level > 30:
             self.state.status = "idle"

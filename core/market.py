@@ -16,16 +16,15 @@ class Market:
         return self.prices.get(resource, 1.0)
 
     def transaction_event(self, resource: ResourceType, is_buy: bool):
-        """Track activity to adjust prices based on supply/demand."""
         if resource == ResourceType.CREDITS:
             return
         if is_buy:
-            self.demand_buffer[resource] = self.demand_buffer.get(resource, 0) + 1
+            self.demand_buffer[resource] += 1
         else:
-            self.supply_buffer[resource] = self.supply_buffer.get(resource, 0) + 1
+            self.supply_buffer[resource] += 1
 
     def update_prices(self):
-        """Dynamic price adjustment based on simple supply/demand ratio."""
+        """Dynamic price adjustment based on supply/demand ratio."""
         for res in ResourceType:
             if res == ResourceType.CREDITS:
                 continue
@@ -33,13 +32,15 @@ class Market:
             demand = self.demand_buffer.get(res, 0)
             supply = self.supply_buffer.get(res, 0)
             
+            # Adjust price based on activity
             if demand > supply:
                 self.prices[res] *= 1.05
-            elif supply > demand and supply > 0:
+            elif supply > demand:
                 self.prices[res] *= 0.95
             
+            # Bound prices to realistic ranges
             self.prices[res] = max(1.0, min(500.0, self.prices[res]))
             
-            # Reset buffers per tick
+            # Decay buffers to favor recent activity
             self.demand_buffer[res] = 0
             self.supply_buffer[res] = 0
