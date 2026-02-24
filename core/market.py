@@ -8,7 +8,6 @@ class Market:
             res: [] for res in ResourceType
         }
         self.transaction_history = []
-        # Optional callback for real-time settlement
         self.on_trade_executed: List[Callable] = []
 
     def place_order(self, order: MarketOrder):
@@ -19,17 +18,14 @@ class Market:
         buys = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.BUY], key=lambda x: x.price, reverse=True)
         sells = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.SELL], key=lambda x: x.price)
 
-        matched_buys = set()
-        matched_sells = set()
-
         for buy in buys:
             for sell in sells:
-                if sell.id in matched_sells or buy.id in matched_buys:
+                if buy.quantity <= 0 or sell.quantity <= 0 or buy.agent_id == sell.agent_id:
                     continue
                 
                 if buy.price >= sell.price:
                     traded_qty = min(buy.quantity, sell.quantity)
-                    clearing_price = sell.price # Seller's price as execution price
+                    clearing_price = sell.price
 
                     trade_record = {
                         "buyer_id": buy.agent_id,
@@ -39,23 +35,18 @@ class Market:
                         "price": clearing_price
                     }
                     
-                    self.transaction_history.append(trade_record)
-                    
-                    # Notify world/agents for immediate settlement
+                    # Execute callbacks
                     for callback in self.on_trade_executed:
                         callback(trade_record)
 
+                    self.transaction_history.append(trade_record)
                     buy.quantity -= traded_qty
                     sell.quantity -= traded_qty
 
-                    if buy.quantity <= 0: matched_buys.add(buy.id)
-                    if sell.quantity <= 0: matched_sells.add(sell.id)
-
-        # Update order book with non-exhausted orders
+        # Cleanup book
         self.order_book[resource] = [
-            o for o in self.order_book[resource] 
-            if o.id not in matched_buys and o.id not in matched_sells and o.quantity > 0
+            o for o in self.order_book[resource] if o.quantity > 0
         ]
-        # Keep history manageable
+        
         if len(self.transaction_history) > 1000:
             self.transaction_history = self.transaction_history[-500:]
