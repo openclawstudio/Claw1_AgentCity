@@ -1,78 +1,46 @@
 import uuid
-from core.models import Position, AgentState, Transaction, ZoneType
-from core.brain import Brain
+import random
+from core.models import AgentState, Position
 
 class Citizen:
-    ENERGY_DECAY = 0.4
-    WORK_REWARD = 12.0
-    WORK_COST = 10.0
-    REST_RECOVERY = 30.0
-    SOCIAL_COST = 4.0
-    SOCIAL_REWARD = 15.0
-
     def __init__(self, name: str, x: int, y: int):
         self.id = str(uuid.uuid4())[:8]
-        self.name = name
-        self.pos = Position(x=x, y=y)
-        self.state = AgentState()
-        self.brain = Brain()
+        self.state = AgentState(id=self.id, name=name, pos=Position(x=x, y=y))
 
     def step(self, world):
-        # 1. Decide action
-        action = self.brain.decide_action(self.state, world)
-        self.state.status_message = f"Intending to {action}"
+        # Basic AI logic: Survive and Trade
+        self.state.energy -= 0.5
         
-        # 2. Identify target
-        target = self.brain.get_target_position(action, self.pos, world)
-        
-        # 3. Move or Act
-        if self.pos != target:
-            self._move_towards(target)
+        # Decision tree
+        if self.state.energy < 30:
+            self.seek_energy(world)
+        elif self.state.wallet > 20:
+            self.seek_commerce(world)
         else:
-            current_zone = world.get_zone(self.pos)
-            self._process_zone_effects(current_zone, world)
-        
-        # 4. State Decay
-        self.state.energy = max(0.0, self.state.energy - self.ENERGY_DECAY)
-        if self.state.energy <= 0:
-            self.state.happiness = max(0.0, self.state.happiness - 1.0)
-            self.state.status_message = "Starving/Exhausted"
+            self.wander(world)
 
-    def _move_towards(self, target: Position):
-        new_x, new_y = self.pos.x, self.pos.y
-        if self.pos.x != target.x:
-            new_x += 1 if target.x > self.pos.x else -1
-        if self.pos.y != target.y:
-            new_y += 1 if target.y > self.pos.y else -1
-        
-        self.pos = Position(x=new_x, y=new_y)
+    def wander(self, world):
+        dx, dy = random.choice([(0,1), (1,0), (0,-1), (-1,0)])
+        new_x = max(0, min(world.state.width - 1, self.state.pos.x + dx))
+        new_y = max(0, min(world.state.height - 1, self.state.pos.y + dy))
+        self.state.pos.x = new_x
+        self.state.pos.y = new_y
 
-    def _process_zone_effects(self, zone, world):
-        if zone == ZoneType.INDUSTRIAL:
-            self.state.wallet.balance += self.WORK_REWARD
-            self.state.energy = max(0.0, self.state.energy - self.WORK_COST)
-            self.state.status_message = "Working"
-            world.record_transaction(Transaction(
-                sender_id="SYSTEM_TREASURY",
-                receiver_id=self.id,
-                amount=self.WORK_REWARD,
-                service_type="labor",
-                timestamp=world.tick_counter
-            ))
-        elif zone == ZoneType.RESIDENTIAL:
-            self.state.energy = min(100.0, self.state.energy + self.REST_RECOVERY)
-            self.state.status_message = "Resting"
-        elif zone == ZoneType.COMMERCIAL:
-            if self.state.wallet.balance >= self.SOCIAL_COST:
-                self.state.wallet.balance -= self.SOCIAL_COST
-                self.state.happiness = min(100.0, self.state.happiness + self.SOCIAL_REWARD)
-                self.state.status_message = "Socializing"
-                world.record_transaction(Transaction(
-                    sender_id=self.id,
-                    receiver_id="COMMERCIAL_VENDORS",
-                    amount=self.SOCIAL_COST,
-                    service_type="consumption",
-                    timestamp=world.tick_counter
-                ))
-            else:
-                self.state.status_message = "Broke at Mall"
+    def seek_energy(self, world):
+        # In an MVP, residential zones replenish energy for a cost
+        if world.get_district_at(self.state.pos.x, self.state.pos.y) == "RESIDENTIAL":
+            cost = world.economy.get_market_price("ENERGY")
+            if self.state.wallet >= cost:
+                self.state.wallet -= cost
+                self.state.energy += 20
+                world.economy.record_transaction(self.id, "CITY_RENT", cost, "ENERGY", world.state.tick)
+        else:
+            self.wander(world)
+
+    def seek_commerce(self, world):
+        # Commercial zones allow 'working' (gaining wallet, losing energy)
+        if world.get_district_at(self.state.pos.x, self.state.pos.y) == "COMMERCIAL":
+            self.state.wallet += world.economy.get_market_price("COMMERCE")
+            self.state.energy -= 2
+        else:
+            self.wander(world)
