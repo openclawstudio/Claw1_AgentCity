@@ -74,15 +74,16 @@ class Citizen:
         jobs = world.marketplace.get_available_jobs()
         
         if jobs:
-            # Simplistic job selection: first available
             job = jobs[0]
             employer = next((b for b in world.businesses if b.id == job.employer_id), None)
             if employer:
                 dist = self._get_distance(self.state.pos, employer.pos)
                 if dist <= 1.5:
-                    if world.economy.transfer(employer, self, job.salary, ResourceType.CREDITS, world.tick_count):
-                        self.state.energy -= 10
-                        world.marketplace.remove_job(job.job_id)
+                    # Check if employer can afford to pay
+                    if employer.balance >= job.salary:
+                        if world.economy.transfer(employer, self, job.salary, ResourceType.CREDITS, world.tick_count):
+                            self.state.energy -= 10
+                            world.marketplace.remove_job(job.job_id)
                 else:
                     self._move_towards(employer.pos)
                 return
