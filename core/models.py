@@ -12,15 +12,16 @@ class Position(BaseModel):
     x: int
     y: int
 
-class InventoryItem(BaseModel):
-    resource_type: ResourceType
-    amount: float
-
 class AgentState(BaseModel):
     id: str
     name: str
     position: Position
-    inventory: Dict[ResourceType, float] = {}
+    inventory: Dict[ResourceType, float] = Field(default_factory=lambda: {
+        ResourceType.ENERGY: 0.0,
+        ResourceType.DATA: 0.0,
+        ResourceType.MATERIALS: 0.0,
+        ResourceType.CREDITS: 0.0
+    })
     energy_level: float = 100.0
     status: str = "idle"
 
