@@ -1,5 +1,4 @@
 from typing import Dict, List, Any
-from .models import InventoryItem
 
 class EconomySystem:
     def __init__(self):
@@ -14,25 +13,40 @@ class EconomySystem:
 
     def transfer(self, sender, receiver, amount: float) -> bool:
         """
-        Generic transfer between objects with a 'balance' or 'vault' attribute.
+        Safely transfers funds between agents or businesses.
+        Handles both AgentState (balance) and BusinessState (vault).
         """
-        sender_balance = getattr(sender, "balance", getattr(sender, "vault", 0))
-        
-        if sender_balance >= amount:
-            if hasattr(sender, "balance"):
-                sender.balance -= amount
-            else:
-                sender.vault -= amount
-                
-            if hasattr(receiver, "balance"):
-                receiver.balance += amount
-            else:
-                receiver.vault += amount
-                
-            self.transaction_history.append({
-                "from": getattr(sender, "id", "unknown"), 
-                "to": getattr(receiver, "id", "unknown"), 
-                "amount": amount
-            })
-            return True
-        return False
+        # Determine sender balance
+        if hasattr(sender, "balance"):
+            s_bal = sender.balance
+        elif hasattr(sender, "vault"):
+            s_bal = sender.vault
+        else:
+            return False
+
+        if s_bal < amount:
+            return False
+
+        # Deduct
+        if hasattr(sender, "balance"):
+            sender.balance -= amount
+        else:
+            sender.vault -= amount
+
+        # Add
+        if hasattr(receiver, "balance"):
+            receiver.balance += amount
+        elif hasattr(receiver, "vault"):
+            receiver.vault += amount
+        else:
+            # If receiver has no wallet, refund sender
+            if hasattr(sender, "balance"): sender.balance += amount
+            else: sender.vault += amount
+            return False
+
+        self.transaction_history.append({
+            "from": getattr(sender, "id", "unknown"), 
+            "to": getattr(receiver, "id", "unknown"), 
+            "amount": amount
+        })
+        return True

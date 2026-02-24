@@ -12,6 +12,9 @@ class Citizen:
         self.state.energy -= 1.0
         
         # 2. Decision Logic
+        if self.state.energy <= 0:
+            return
+
         if self.state.energy < 30:
             self._seek_energy(world)
         elif self.state.role == Role.CITIZEN and self.state.balance > 1000:
@@ -39,35 +42,39 @@ class Citizen:
         self.state.pos = (new_x, new_y)
 
     def _seek_energy(self, world):
-        if world.businesses:
-            # Find nearest business (Simple Euclidean heuristic)
-            target_biz = min(
-                world.businesses.values(), 
-                key=lambda b: (b.pos[0]-self.state.pos[0])**2 + (b.pos[1]-self.state.pos[1])**2
-            )
-            
-            if self.state.pos == target_biz.pos:
-                # Use Economy System for formal transfer
-                owner = world.agents.get(target_biz.owner_id)
-                cost = 15.0
-                energy_gain = 40.0
-                
-                if self.state.balance >= cost:
-                    success = world.economy.transfer(self.state, owner.state if owner else target_biz, cost)
-                    if success:
-                        self.state.energy = min(100.0, self.state.energy + energy_gain)
-                        if not owner: # If owner is gone, money goes to business vault
-                            target_biz.vault += cost
-            else:
-                self._move_towards(world, target_biz.pos)
-        else:
+        if not world.businesses:
             self._random_move(world)
+            return
+
+        # Find nearest business
+        target_biz = min(
+            world.businesses.values(), 
+            key=lambda b: (b.pos[0]-self.state.pos[0])**2 + (b.pos[1]-self.state.pos[1])**2
+        )
+        
+        if self.state.pos == target_biz.pos:
+            # Don't pay if you own the business
+            if target_biz.owner_id == self.state.id:
+                self.state.energy = min(100.0, self.state.energy + 40.0)
+                return
+
+            owner = world.agents.get(target_biz.owner_id)
+            cost = 15.0
+            energy_gain = 40.0
+            
+            # Target the owner's state or the business vault
+            receiver = owner.state if owner else target_biz
+            if self.state.balance >= cost:
+                success = world.economy.transfer(self.state, receiver, cost)
+                if success:
+                    self.state.energy = min(100.0, self.state.energy + energy_gain)
+        else:
+            self._move_towards(world, target_biz.pos)
 
     def _become_entrepreneur(self, world):
         setup_cost = 500.0
         if self.state.balance >= setup_cost:
             self.state.balance -= setup_cost
             self.state.role = Role.ENTREPRENEUR
-            # Entrepreneurs also get a small starting inventory of energy to sell
             world.create_business(self.state.id, self.state.pos, "Energy Hub")
             print(f"Agent {self.state.id} founded a business at {self.state.pos}")
