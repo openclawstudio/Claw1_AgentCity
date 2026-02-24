@@ -1,46 +1,23 @@
-from typing import Dict, List, Optional
-from core.models import ResourceType
+from typing import List, Dict
+from pydantic import BaseModel
+
+class Order(BaseModel):
+    agent_id: str
+    item: str
+    price: float
+    order_type: str # 'buy' or 'sell'
 
 class Market:
     def __init__(self):
-        self.prices = {
-            ResourceType.ENERGY: 10.0,
-            ResourceType.DATA: 15.0,
-            ResourceType.MATERIALS: 20.0,
-            ResourceType.CREDITS: 1.0
-        }
-        self.demand_buffer: Dict[ResourceType, int] = {res: 0 for res in ResourceType}
-        self.supply_buffer: Dict[ResourceType, int] = {res: 0 for res in ResourceType}
+        self.listings: List[Order] = []
 
-    def get_price(self, resource: ResourceType) -> float:
-        return self.prices.get(resource, 1.0)
+    def post_order(self, order: Order):
+        self.listings.append(order)
 
-    def transaction_event(self, resource: ResourceType, is_buy: bool):
-        if resource == ResourceType.CREDITS:
-            return
-        if is_buy:
-            self.demand_buffer[resource] += 1
-        else:
-            self.supply_buffer[resource] += 1
+    def find_match(self, item: str, max_price: float):
+        matches = [o for o in self.listings if o.item == item and o.order_type == 'sell' and o.price <= max_price]
+        return sorted(matches, key=lambda x: x.price)[0] if matches else None
 
-    def update_prices(self):
-        """Dynamic price adjustment based on supply/demand ratio."""
-        for res in ResourceType:
-            if res == ResourceType.CREDITS:
-                continue
-                
-            demand = self.demand_buffer.get(res, 0)
-            supply = self.supply_buffer.get(res, 0)
-            
-            # Adjust price based on activity
-            if demand > supply:
-                self.prices[res] *= 1.05
-            elif supply > demand:
-                self.prices[res] *= 0.95
-            
-            # Bound prices to realistic ranges
-            self.prices[res] = max(1.0, min(500.0, self.prices[res]))
-            
-            # Decay buffers to favor recent activity
-            self.demand_buffer[res] = 0
-            self.supply_buffer[res] = 0
+    def remove_order(self, order: Order):
+        if order in self.listings:
+            self.listings.remove(order)

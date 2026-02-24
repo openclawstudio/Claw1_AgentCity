@@ -1,41 +1,39 @@
-from typing import List
-from core.agent import CitizenAgent
-from core.market import Market
-from core.economy import EconomyEngine
-from core.models import WorldState, AgentState
+import random
+from typing import List, Dict
+from .models import Position, ZoneType, AgentState
+
+class Cell:
+    def __init__(self, pos: Position, zone: ZoneType):
+        self.pos = pos
+        self.zone = zone
+        self.resources = 100.0
 
 class World:
     def __init__(self, width: int, height: int):
         self.width = width
         self.height = height
-        self.tick = 0
-        self.agents: List[CitizenAgent] = []
-        self.market = Market()
-        self.economy = EconomyEngine()
+        self.grid: Dict[str, Cell] = {}
+        self.agents: List[AgentState] = []
+        self._initialize_grid()
 
-    def add_agent(self, agent: CitizenAgent):
-        self.agents.append(agent)
+    def _initialize_grid(self):
+        zones = list(ZoneType)
+        for x in range(self.width):
+            for y in range(self.height):
+                key = f"{x},{y}"
+                zone = random.choice(zones)
+                self.grid[key] = Cell(Position(x=x, y=y), zone)
 
-    def step(self):
-        self.tick += 1
-        self.market.update_prices()
+    def get_cell(self, pos: Position) -> Cell:
+        return self.grid.get(f"{pos.x},{pos.y}")
+
+    def tick(self):
         for agent in self.agents:
-            agent.step(self)
-
-    def export_state(self) -> WorldState:
-        return WorldState(
-            tick=self.tick,
-            agents=[a.state for a in self.agents],
-            market_prices=self.market.prices
-        )
-
-    def get_summary(self):
-        total_agents = len(self.agents)
-        avg_energy = sum(a.state.energy_level for a in self.agents) / total_agents if total_agents else 0
-        return {
-            "tick": self.tick,
-            "population": total_agents,
-            "avg_energy": round(avg_energy, 2),
-            "market_prices": self.market.prices,
-            "total_transactions": len(self.economy.ledger.transactions)
-        }
+            # Natural energy decay
+            agent.energy -= 0.5
+            # Apply zone-based effects
+            cell = self.get_cell(agent.pos)
+            if cell.zone == ZoneType.RESIDENTIAL:
+                agent.energy = min(100.0, agent.energy + 2.0)
+            elif cell.zone == ZoneType.INDUSTRIAL:
+                agent.energy -= 1.0

@@ -1,39 +1,22 @@
-from core.models import ResourceType, AgentState, AgentStatus
-from typing import List, Dict, Any
+from typing import Dict
+from .models import AgentState, ResourceType
 
-class Ledger:
-    def __init__(self):
-        self.transactions: List[Dict[str, Any]] = []
+class EconomySystem:
+    TAX_RATE = 0.05
+    
+    @staticmethod
+    def process_transaction(buyer: AgentState, seller: AgentState, amount: float, item: str):
+        if buyer.wallet >= amount:
+            buyer.wallet -= amount
+            seller.wallet += amount * (1 - EconomySystem.TAX_RATE)
+            
+            # Update inventory
+            buyer.inventory[item] = buyer.inventory.get(item, 0) + 1
+            seller.inventory[item] = max(0, seller.inventory.get(item, 0) - 1)
+            return True
+        return False
 
-    def record(self, sender: str, receiver: str, resource: ResourceType, amount: float, price: float):
-        self.transactions.append({
-            "sender": sender,
-            "receiver": receiver,
-            "resource": resource,
-            "amount": amount,
-            "total_cost": amount * price
-        })
-
-    def get_total_volume(self) -> float:
-        return sum(t["total_cost"] for t in self.transactions)
-
-class EconomyEngine:
-    def __init__(self):
-        self.ledger = Ledger()
-        self.base_consumption = 0.5
-        self.work_reward_credits = 2.0
-        self.work_reward_data = 0.5
-        self.work_reward_materials = 0.2
-
-    def process_consumption(self, agent_state: AgentState):
-        multiplier = 1.5 if agent_state.status == AgentStatus.WORKING else 1.0
-        usage = self.base_consumption * multiplier
-        agent_state.energy_level = max(0.0, agent_state.energy_level - usage)
-        if agent_state.energy_level <= 0:
-            agent_state.status = AgentStatus.EXHAUSTED
-
-    def apply_work_effects(self, agent_state: AgentState):
-        agent_state.inventory[ResourceType.CREDITS] += self.work_reward_credits
-        agent_state.inventory[ResourceType.DATA] += self.work_reward_data
-        agent_state.inventory[ResourceType.MATERIALS] += self.work_reward_materials
-        agent_state.status = AgentStatus.WORKING
+    @staticmethod
+    def pay_wage(agent: AgentState, amount: float):
+        agent.wallet += amount
+        agent.energy -= 10.0 # Working costs energy
