@@ -13,7 +13,6 @@ class CitizenAgent:
 
     def decide(self, economy: 'EconomySystem', buildings: List[Building], world_width: int, world_height: int):
         """Main decision logic based on internal utility."""
-        # Determine priority goal
         if self.state.energy < 20:
             self.state.current_goal = "rest"
             self._seek_building(economy, buildings, BuildingType.HOME, world_width, world_height)
@@ -34,13 +33,10 @@ class CitizenAgent:
             self._random_move(w, h)
             return
 
-        # Manhattan distance to find nearest facility
         target = min(targets, key=lambda b: abs(b.pos.x - self.state.pos.x) + abs(b.pos.y - self.state.pos.y))
         
         if self.state.pos.x == target.pos.x and self.state.pos.y == target.pos.y:
-            # Entering building
             if self.state.id not in target.occupants:
-                # First, ensure we leave any other building
                 self._exit_all_buildings(buildings)
                 target.enter(self.state.id)
             self._perform_activity(economy, target)
@@ -60,6 +56,7 @@ class CitizenAgent:
         if self.state.pos.y < target_pos.y: self.state.pos.y += 1
         elif self.state.pos.y > target_pos.y: self.state.pos.y -= 1
         
+        # Standard cost per move action
         self.state.energy = round(max(0.0, self.state.energy - 0.5), 2)
 
     def _random_move(self, w: int, h: int):
