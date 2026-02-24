@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from enum import Enum
 
 class Role(str, Enum):
@@ -20,7 +20,7 @@ class InventoryItem(BaseModel):
 
 class AgentState(BaseModel):
     id: str
-    pos: tuple[int, int]
+    pos: Tuple[int, int]
     role: Role = Role.CITIZEN
     energy: float = 100.0
     balance: float = 500.0
@@ -30,7 +30,7 @@ class AgentState(BaseModel):
 class BusinessState(BaseModel):
     id: str
     owner_id: str
-    pos: tuple[int, int]
+    pos: Tuple[int, int]
     business_type: str
     employees: List[str] = []
-    vault: float = 0.0
+    balance: float = 0.0  # Renamed from vault for polymorphic transfer logic
