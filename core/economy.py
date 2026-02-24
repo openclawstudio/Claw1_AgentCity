@@ -1,22 +1,24 @@
-from typing import Dict, List
-from pydantic import BaseModel
-
-class Transaction(BaseModel):
-    sender_id: str
-    receiver_id: str
-    amount: float
-    commodity: str = "CREDITS"
-    timestamp: int
+from typing import List
+from .models import Transaction
 
 class EconomyManager:
     def __init__(self):
-        self.transactions: List[Transaction] = []
-        self.prices: Dict[str, float] = {"SHELTER": 10.0, "ENERGY": 5.0, "COMMERCE": 2.0}
+        self.ledger: List[Transaction] = []
 
-    def record_transaction(self, sender_id: str, receiver_id: str, amount: float, commodity: str, tick: int):
-        tx = Transaction(sender_id=sender_id, receiver_id=receiver_id, amount=amount, commodity=commodity, timestamp=tick)
-        self.transactions.append(tx)
-        return tx
+    def transfer(self, sender, receiver, amount: float, purpose: str, tick: int) -> bool:
+        if sender.state.wallet >= amount:
+            sender.state.wallet -= amount
+            receiver.state.wallet += amount
+            tx = Transaction(
+                sender_id=sender.id,
+                receiver_id=receiver.id,
+                amount=amount,
+                purpose=purpose,
+                timestamp=tick
+            )
+            self.ledger.append(tx)
+            return True
+        return False
 
-    def get_market_price(self, commodity: str) -> float:
-        return self.prices.get(commodity, 1.0)
+    def get_total_wealth(self, agents) -> float:
+        return sum(a.state.wallet for a in agents)
