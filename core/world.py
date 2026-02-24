@@ -25,7 +25,7 @@ class World:
                 elif choice < 0.6: self.zones[(x, y)] = ZoneType.RESIDENTIAL
                 else: self.zones[(x, y)] = ZoneType.EMPTY
 
-    def get_zone(self, pos: Tuple[int, int]) -> ZoneType:
+    def get_zone(self, pos: Tuple[int, int]) -> ZoneType: # type: ignore
         return self.zones.get(pos, ZoneType.EMPTY)
 
     def get_zones_by_type(self, zone_type: ZoneType) -> List[Tuple[int, int]]:
@@ -33,13 +33,17 @@ class World:
 
     def step(self):
         self.tick_count += 1
-        # Update fast-lookup map
+        
+        # 1. Update fast-lookup map for the current tick
         self.agent_map = {a.id: a for a in self.agents if a.alive}
         
-        # Perform actions
+        # 2. Cleanup market (remove offers from dead agents)
+        self.market.cleanup_stale_offers(self.agent_map)
+        
+        # 3. Perform actions
         for agent in self.agents:
             if agent.alive:
                 agent.step(self)
         
-        # Cleanup dead agents from active list
+        # 4. Cleanup dead agents from simulation
         self.agents = [a for a in self.agents if a.alive]
