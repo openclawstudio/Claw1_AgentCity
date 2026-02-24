@@ -1,5 +1,5 @@
 import random
-from .models import AgentState, Role, InventoryItem
+from .models import AgentState, Role
 
 class Citizen:
     def __init__(self, agent_id: str, x: int, y: int):
@@ -18,6 +18,19 @@ class Citizen:
         else:
             self._random_move(world)
 
+    def _move_towards(self, world, target_pos):
+        tx, ty = target_pos
+        cx, cy = self.state.pos
+        
+        dx = 1 if tx > cx else -1 if tx < cx else 0
+        dy = 1 if ty > cy else -1 if ty < cy else 0
+        
+        new_pos = (
+            max(0, min(world.width - 1, cx + dx)),
+            max(0, min(world.height - 1, cy + dy))
+        )
+        self.state.pos = new_pos
+
     def _random_move(self, world):
         dx, dy = random.choice([(0,1), (0,-1), (1,0), (-1,0)])
         new_x = max(0, min(world.width - 1, self.state.pos[0] + dx))
@@ -25,22 +38,30 @@ class Citizen:
         self.state.pos = (new_x, new_y)
 
     def _seek_energy(self, world):
-        # Look for the nearest business providing energy (placeholder logic for finding locations)
         if world.businesses:
-            # Move toward first business as a simple heuristic
-            target_pos = list(world.businesses.values())[0].pos
-            dx = 1 if target_pos[0] > self.state.pos[0] else -1 if target_pos[0] < self.state.pos[0] else 0
-            dy = 1 if target_pos[1] > self.state.pos[1] else -1 if target_pos[1] < self.state.pos[1] else 0
-            self.state.pos = (self.state.pos[0] + dx, self.state.pos[1] + dy)
+            # Find nearest business (Simple Euclidean heuristic)
+            target_biz = min(
+                world.businesses.values(), 
+                key=lambda b: (b.pos[0]-self.state.pos[0])**2 + (b.pos[1]-self.state.pos[1])**2
+            )
             
-            # If at a business, 'recharge'
-            if self.state.pos == target_pos and self.state.balance >= 10:
-                self.state.balance -= 10
-                self.state.energy = min(100.0, self.state.energy + 40)
+            if self.state.pos == target_biz.pos:
+                # Attempt transaction
+                if self.state.balance >= 10:
+                    self.state.balance -= 10
+                    self.state.energy = min(100.0, self.state.energy + 40)
+                    # In a real cycle, we would transfer to owner, but simplified for now
+                    target_biz.vault += 10
+            else:
+                self._move_towards(world, target_biz.pos)
         else:
             self._random_move(world)
 
     def _become_entrepreneur(self, world):
-        self.state.role = Role.ENTREPRENEUR
-        world.create_business(self.state.id, self.state.pos, "Energy Hub")
-        print(f"Agent {self.state.id} started an Energy Hub at {self.state.pos}!")
+        # Deduct cost of starting business to prevent spam
+        setup_cost = 500
+        if self.state.balance >= setup_cost:
+            self.state.balance -= setup_cost
+            self.state.role = Role.ENTREPRENEUR
+            world.create_business(self.state.id, self.state.pos, "Energy Hub")
+            print(f"Agent {self.state.id} spent {setup_cost} to start an Energy Hub at {self.state.pos}!")
