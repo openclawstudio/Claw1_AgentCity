@@ -6,24 +6,36 @@ class ZoneType(str, Enum):
     RESIDENTIAL = "residential"
     COMMERCIAL = "commercial"
     INDUSTRIAL = "industrial"
-    WILDERNESS = "wilderness"
+    OPEN_SPACE = "open_space"
 
 class ResourceType(str, Enum):
+    CURRENCY = "credits"
     ENERGY = "energy"
-    CURRENCY = "currency"
     MATERIALS = "materials"
-    KNOWLEDGE = "knowledge"
+    FOOD = "food"
 
 class Position(BaseModel):
     x: int
     y: int
+
+class InventoryItem(BaseModel):
+    type: ResourceType
+    amount: float
+
+class Job(BaseModel):
+    id: str
+    employer_id: str
+    title: str
+    payout: float
+    energy_cost: float
+    location: Position
+    completed: bool = False
 
 class AgentState(BaseModel):
     id: str
     name: str
     pos: Position
     energy: float = 100.0
-    wallet: float = 50.0
-    inventory: Dict[str, float] = {}
-    profession: str = "unemployed"
-    last_action: str = "idle"
+    balance: float = 0.0
+    inventory: List[InventoryItem] = []
+    current_goal: Optional[str] = None

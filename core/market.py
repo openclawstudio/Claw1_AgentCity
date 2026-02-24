@@ -1,27 +1,20 @@
-from typing import List, Optional
-from pydantic import BaseModel, Field
-import uuid
+from typing import List
+from .models import Job, Position
 
-class Order(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    agent_id: str
-    item: str
-    price: float
-    order_type: str # 'buy' or 'sell'
+class JobBoard:
+    def __init__(self):
+        self.available_jobs: List[Job] = []
+
+    def post_job(self, job: Job):
+        self.available_jobs.append(job)
+
+    def take_job(self, agent_id: str) -> Job:
+        if not self.available_jobs:
+            return None
+        # Simple FIFO for MVP
+        return self.available_jobs.pop(0)
 
 class Market:
     def __init__(self):
-        self.listings: List[Order] = []
-
-    def post_order(self, order: Order):
-        self.listings.append(order)
-
-    def find_match(self, item: str, max_price: float) -> Optional[Order]:
-        matches = [o for o in self.listings if o.item == item and o.order_type == 'sell' and o.price <= max_price]
-        if not matches:
-            return None
-        # Return cheapest option
-        return min(matches, key=lambda x: x.price)
-
-    def remove_order(self, order_id: str):
-        self.listings = [o for o in self.listings if o.id != order_id]
+        self.job_board = JobBoard()
+        self.resource_prices = {"food": 10.0, "materials": 25.0}

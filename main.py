@@ -1,88 +1,52 @@
 import time
-import random
 from core.world import World
-from core.agent import CitizenAgent
-from core.models import Position, ZoneType
-from core.economy import EconomySystem
-from core.market import Market, Order
+from core.agent import Citizen
+from core.market import Market
+from core.economy import EconomyManager
+from core.models import Position, Job
+import uuid
 
 def run_simulation():
-    print("--- AgentCity: Autonomous Metropolis v1.2 ---")
-    world_width = 10
-    world_height = 10
-    world = World(world_width, world_height)
+    print("--- Starting AgentCity MVP ---")
+    world = World(10, 10)
     market = Market()
+    economy = EconomyManager()
     
     # Spawn agents
-    agents = [
-        CitizenAgent("a1", "Alice", Position(x=0, y=0)),
-        CitizenAgent("a2", "Bob", Position(x=5, y=5)),
-        CitizenAgent("a3", "Charlie", Position(x=9, y=9))
+    citizens = [
+        Citizen(f"Agent_{i}", Position(x=random.randint(0,9), y=random.randint(0,9)))
+        for i in range(5)
     ]
-    
-    # Setup initial state for a 'Merchant'
-    agents[1].state.inventory["energy_pack"] = 10
-    market.post_order(Order(agent_id="a2", item="energy_pack", price=15.0, order_type="sell"))
 
-    world.agents = [a.state for a in agents]
+    # Add initial liquidity/jobs
+    market.job_board.post_job(Job(
+        id=str(uuid.uuid4()),
+        employer_id="SYSTEM",
+        title="Factory Shift",
+        payout=50.0,
+        energy_cost=20.0,
+        location=Position(x=8, y=5)
+    ))
 
-    ticks = 0
     try:
-        while ticks < 100:
-            print(f"\n--- Tick {ticks} ---")
-            world.tick()
-
-            for agent in agents:
-                if agent.state.energy <= 0:
-                    print(f"{agent.state.name:7} | EXHAUSTED (Incapacitated)")
-                    continue
-
-                # 1. Decision logic
-                dx, dy = agent.decide_action(world)
-                agent.apply_move(dx, dy, world_width, world_height)
-                
-                current_cell = world.get_cell(agent.state.pos)
-                
-                # 2. Zone-based interactions
-                if current_cell.zone == ZoneType.INDUSTRIAL:
-                    EconomySystem.pay_wage(agent.state, 12.0)
-                    agent.state.last_action = "working"
-                
-                elif current_cell.zone == ZoneType.COMMERCIAL:
-                    # Try to maintain survival
-                    if agent.state.energy < 40 and agent.state.wallet >= 15:
-                        match = market.find_match("energy_pack", agent.state.wallet)
-                        if match:
-                            # Find the seller agent
-                            seller_agent = next((a for a in agents if a.state.id == match.agent_id), None)
-                            if seller_agent:
-                                success = EconomySystem.process_transaction(
-                                    agent.state, seller_agent.state, "energy_pack", match.price
-                                )
-                                if success:
-                                    EconomySystem.consume_resource(agent.state, "energy_pack", 30.0)
-                                    agent.state.last_action = "bought_and_consumed"
-                                    # If seller is out of stock, remove listing
-                                    if seller_agent.state.inventory.get("energy_pack", 0) <= 0:
-                                        market.remove_order(match.id)
-
-                status = (f"{agent.state.name:7} | "
-                          f"Energy: {agent.state.energy:5.1f} | "
-                          f"Wallet: {agent.state.wallet:5.1f} | "
-                          f"Pos: ({agent.state.pos.x},{agent.state.pos.y}) | "
-                          f"Zone: {current_cell.zone.value:11} | "
-                          f"Action: {agent.state.last_action}")
-                print(status)
+        for tick in range(50):
+            print(f"\nTick {tick} | GDP: {economy.global_gdp}")
+            for agent in citizens:
+                agent.step(market, economy, world)
+                print(f"{agent.state.name}: Energy={agent.state.energy}, Balance={agent.state.balance}")
             
-            ticks += 1
-            time.sleep(0.1)
+            # Periodic job injection
+            if tick % 5 == 0:
+                market.job_board.post_job(Job(
+                    id=str(uuid.uuid4()), employer_id="SYSTEM",
+                    title="Cleaning Drive", payout=30.0, energy_cost=10.0,
+                    location=Position(x=random.randint(0,9), y=random.randint(0,9))
+                ))
             
+            time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nSimulation stopped by user.")
-    except Exception as e:
-        print(f"\nSimulation crashed: {e}")
-        import traceback
-        traceback.print_exc()
+        print("Simulation stopped.")
 
-if __name__ == '__main__':
+import random
+if __name__ == "__main__":
     run_simulation()

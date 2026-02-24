@@ -1,42 +1,30 @@
-from typing import Dict, Optional
-from .models import AgentState, ResourceType
+from typing import List, Dict
+import uuid
 
-class EconomySystem:
-    TAX_RATE = 0.05
-    
-    @staticmethod
-    def process_transaction(buyer: AgentState, seller: AgentState, item: str, price: float) -> bool:
-        """Executes a trade between two agents."""
-        if buyer.wallet < price:
-            return False
-        
-        seller_stock = seller.inventory.get(item, 0)
-        if seller_stock <= 0:
-            return False
-            
-        # Exchange currency
-        buyer.wallet -= price
-        tax = price * EconomySystem.TAX_RATE
-        seller.wallet += (price - tax)
-        
-        # Exchange goods
-        seller.inventory[item] = seller_stock - 1
-        buyer.inventory[item] = buyer.inventory.get(item, 0) + 1
-        
-        return True
+class Ledger:
+    def __init__(self):
+        self.transactions: List[Dict] = []
 
-    @staticmethod
-    def pay_wage(agent: AgentState, amount: float):
-        """Standardized wage payment for labor."""
-        agent.wallet += amount
-        # Working costs energy
-        agent.energy = max(0.0, agent.energy - 5.0)
+    def record(self, sender: str, receiver: str, amount: float, purpose: str):
+        entry = {
+            "id": str(uuid.uuid4()),
+            "sender": sender,
+            "receiver": receiver,
+            "amount": amount,
+            "purpose": purpose
+        }
+        self.transactions.append(entry)
+        return entry
 
-    @staticmethod
-    def consume_resource(agent: AgentState, item: str, energy_gain: float) -> bool:
-        """Agent consumes an item from inventory to regain energy."""
-        if agent.inventory.get(item, 0) >= 1:
-            agent.inventory[item] -= 1
-            agent.energy = min(100.0, agent.energy + energy_gain)
-            return True
-        return False
+class EconomyManager:
+    def __init__(self):
+        self.ledger = Ledger()
+        self.global_gdp = 0.0
+
+    def transfer(self, sender_agent, receiver_agent, amount: float, reason: str):
+        if sender_agent.balance >= amount:
+            sender_agent.balance -= amount
+            receiver_agent.balance += amount
+            self.global_gdp += amount
+            return self.ledger.record(sender_agent.id, receiver_agent.id, amount, reason)
+        return None
