@@ -21,6 +21,11 @@ class EconomyManager:
         self.ledger = Ledger()
         self.global_gdp = 0.0
 
+    def record_payout(self, employer_id: str, employee_id: str, amount: float, title: str):
+        """Centralized method to handle job payouts and GDP tracking."""
+        self.global_gdp += amount
+        return self.ledger.record(employer_id, employee_id, amount, f"Job: {title}")
+
     def transfer(self, sender_agent, receiver_agent, amount: float, reason: str):
         if sender_agent.balance >= amount:
             sender_agent.balance -= amount

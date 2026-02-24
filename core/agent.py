@@ -48,7 +48,7 @@ class Citizen:
             self.state.energy -= 2
 
     def move_randomly(self, world):
-        # Safe removal
+        # Safe removal from current location
         current_cell = world.get_cell(self.state.pos)
         if self.id in current_cell.agents:
             current_cell.agents.remove(self.id)
@@ -58,7 +58,7 @@ class Citizen:
         new_y = max(0, min(world.height - 1, self.state.pos.y + dy))
         self.state.pos = Position(x=new_x, y=new_y)
         
-        # Add to new cell
+        # Add to new cell tracking
         world.get_cell(self.state.pos).agents.append(self.id)
 
     def buy_resource(self, res_type: ResourceType, market: Market):
@@ -81,7 +81,7 @@ class Citizen:
             print(f"Agent {self.state.name} bought {res_type.value} for {cost}")
 
     def work(self, job: Job, economy: EconomyManager, world):
-        # Update world spatial mapping
+        # Ensure agent is moved to the job site
         old_cell = world.get_cell(self.state.pos)
         if self.id in old_cell.agents:
             old_cell.agents.remove(self.id)
@@ -89,11 +89,12 @@ class Citizen:
         self.state.pos = job.location
         world.get_cell(self.state.pos).agents.append(self.id)
         
+        # Process work mechanics
         self.state.energy -= job.energy_cost
-        
-        # Financial transaction recorded via Ledger
-        economy.ledger.record(job.employer_id, self.id, job.payout, f"Job: {job.title}")
         self.state.balance += job.payout
-        economy.global_gdp += job.payout
+        
+        # Financial transaction record through central manager
+        economy.record_payout(job.employer_id, self.id, job.payout, job.title)
+        
         job.completed = True
         print(f"Agent {self.state.name} completed job: {job.title} (+{job.payout})")
