@@ -1,32 +1,28 @@
-import unittest
+import pytest
 from core.world import World
-from core.agent import Agent
-from core.models import ZoneType
+from core.agent import CitizenAgent
+from core.models import ResourceType
 
-class TestAgentCity(unittest.TestCase):
-    def test_world_init(self):
-        world = World(5, 5)
-        self.assertEqual(len(world.zones), 25)
+def test_agent_energy_consumption():
+    world = World(10, 10)
+    agent = CitizenAgent("test-1", "Test", 5, 5)
+    initial_energy = agent.state.energy_level
+    agent.step(world)
+    assert agent.state.energy_level < initial_energy
 
-    def test_agent_energy_death(self):
-        world = World(5, 5)
-        agent = Agent("test", (0,0))
-        agent.state.energy = 0.1
-        world.agents.append(agent)
-        world.step()
-        self.assertFalse(agent.alive)
-        self.assertEqual(len(world.agents), 0)
+def test_market_price_evolution():
+    world = World(10, 10)
+    initial_price = world.market.get_price(ResourceType.ENERGY)
+    # Simulate high demand
+    for _ in range(5):
+        world.market.transaction_event(ResourceType.ENERGY, is_buy=True)
+    world.market.update_prices()
+    assert world.market.get_price(ResourceType.ENERGY) > initial_price
 
-    def test_economy_transfer(self):
-        world = World(5, 5)
-        a1 = Agent("a1", (0,0))
-        a2 = Agent("a2", (0,0))
-        a1.state.wallet = 100
-        a2.state.wallet = 0
-        success = world.economy.transfer(a1, a2, 50, "test", 1)
-        self.assertTrue(success)
-        self.assertEqual(a1.state.wallet, 50)
-        self.assertEqual(a2.state.wallet, 50)
-
-if __name__ == '__main__':
-    unittest.main()
+def test_economy_ledger():
+    world = World(10, 10)
+    agent = CitizenAgent("test-1", "Test", 5, 5)
+    agent.state.inventory[ResourceType.CREDITS] = 1000
+    agent.seek_energy(world)
+    assert len(world.economy.ledger.transactions) > 0
+    assert world.economy.ledger.transactions[0]['amount'] == 1

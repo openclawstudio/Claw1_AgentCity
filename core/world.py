@@ -2,6 +2,7 @@ from typing import List
 from core.agent import CitizenAgent
 from core.market import Market
 from core.economy import EconomyEngine
+from core.models import WorldState, AgentState
 
 class World:
     def __init__(self, width: int, height: int):
@@ -20,6 +21,13 @@ class World:
         self.market.update_prices()
         for agent in self.agents:
             agent.step(self)
+
+    def export_state(self) -> WorldState:
+        return WorldState(
+            tick=self.tick,
+            agents=[a.state for a in self.agents],
+            market_prices=self.market.prices
+        )
 
     def get_summary(self):
         total_agents = len(self.agents)
