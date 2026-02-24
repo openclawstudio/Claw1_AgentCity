@@ -1,5 +1,5 @@
 import uuid
-from core.models import Position, AgentState, Transaction
+from core.models import Position, AgentState, Transaction, ZoneType
 from core.brain import Brain
 
 class Citizen:
@@ -26,6 +26,7 @@ class Citizen:
         
         # 5. Decay
         self.state.energy -= 0.5
+        self.state.energy = max(0, self.state.energy)
 
     def _move_towards(self, target):
         if self.pos.x < target.x: self.pos.x += 1
@@ -34,13 +35,31 @@ class Citizen:
         elif self.pos.y > target.y: self.pos.y -= 1
 
     def _process_zone_effects(self, zone, world):
-        from core.models import ZoneType
         if zone == ZoneType.INDUSTRIAL:
-            self.state.wallet.balance += 2.0
+            # Work logic: Earn money at cost of energy
+            income = 2.0
+            self.state.wallet.balance += income
             self.state.energy -= 1.0
+            world.record_transaction(Transaction(
+                sender_id="SYSTEM_TREASURY",
+                receiver_id=self.id,
+                amount=income,
+                service_type="labor",
+                timestamp=world.tick_counter
+            ))
         elif zone == ZoneType.RESIDENTIAL:
+            # Rest logic
             self.state.energy = min(100, self.state.energy + 5.0)
         elif zone == ZoneType.COMMERCIAL:
+            # Consumption logic: Spend money for happiness
             if self.state.wallet.balance >= 1.0:
-                self.state.wallet.balance -= 1.0
-                self.state.happiness += 2.0
+                cost = 1.0
+                self.state.wallet.balance -= cost
+                self.state.happiness = min(100, self.state.happiness + 2.0)
+                world.record_transaction(Transaction(
+                    sender_id=self.id,
+                    receiver_id="COMMERCIAL_VENDORS",
+                    amount=cost,
+                    service_type="consumption",
+                    timestamp=world.tick_counter
+                ))
