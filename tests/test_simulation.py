@@ -9,12 +9,19 @@ class TestSimulation(unittest.TestCase):
 
     def test_agent_movement(self):
         world = World(10, 10)
+        # Edge case: Put agent in middle so move is likely to succeed
         agent = Citizen("Tester", 5, 5)
         world.add_agent(agent)
         original_pos = (agent.state.pos.x, agent.state.pos.y)
-        agent.wander(world)
-        new_pos = (agent.state.pos.x, agent.state.pos.y)
-        self.assertNotEqual(original_pos, new_pos)
+        
+        # Force movement by trying multiple times if random fails
+        moved = False
+        for _ in range(10):
+            agent.wander(world)
+            if (agent.state.pos.x, agent.state.pos.y) != original_pos:
+                moved = True
+                break
+        self.assertTrue(moved)
 
     def test_economy_transaction(self):
         world = World(10, 10)

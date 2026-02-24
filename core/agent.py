@@ -1,5 +1,6 @@
 import uuid
 import random
+from typing import Optional
 from core.models import AgentState, Position
 
 class Citizen:
