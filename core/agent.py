@@ -6,6 +6,7 @@ class Citizen:
     def __init__(self, name: str, x: int, y: int):
         self.id = str(uuid.uuid4())[:8]
         self.state = AgentState(id=self.id, name=name, pos=Position(x=x, y=y))
+        self.destination: Optional[Position] = None
 
     def step(self, world):
         # 1. Metabolism
@@ -27,12 +28,15 @@ class Citizen:
             self.seek_commerce(world)
 
     def recover_exhaustion(self, world):
-        self.state.energy = round(min(100.0, self.state.energy + 2.0), 2)
+        self.state.energy = round(min(100.0, self.state.energy + 5.0), 2)
         self.state.current_goal = "EXHAUSTED"
 
     def wander(self, world):
-        dx, dy = random.choice([(0, 1), (1, 0), (0, -1), (-1, 0)])
-        self._move_clamped(world, dx, dy)
+        # Random walk with 20% chance of staying put
+        if random.random() < 0.8:
+            dx = random.randint(-1, 1)
+            dy = random.randint(-1, 1)
+            self._move_clamped(world, dx, dy)
 
     def seek_energy(self, world):
         current_zone = world.get_district_at(self.state.pos.x, self.state.pos.y)
@@ -42,8 +46,11 @@ class Citizen:
                 self.state.wallet -= cost
                 self.state.energy = min(100.0, self.state.energy + 40)
                 world.economy.record_transaction(self.id, "HOUSING_CORP", cost, "ENERGY", world.state.tick)
+            else:
+                # Can't afford energy, just wait (rest)
+                self.state.energy = min(100.0, self.state.energy + 0.5)
         else:
-            # Move Left towards Residential
+            # Move Left towards Residential (x < mid_x)
             dx = -1 if self.state.pos.x > 0 else 0
             dy = random.choice([-1, 0, 1])
             self._move_clamped(world, dx, dy)
@@ -56,13 +63,15 @@ class Citizen:
             self.state.energy -= 1.0
             world.economy.record_transaction("MARKET", self.id, wage, "CREDITS", world.state.tick)
         else:
-            # Move Right towards Commercial
+            # Move Right towards Commercial (x >= mid_x)
             dx = 1 if self.state.pos.x < world.state.width - 1 else 0
             dy = random.choice([-1, 0, 1])
             self._move_clamped(world, dx, dy)
 
     def _move_clamped(self, world, dx, dy):
+        old_x, old_y = self.state.pos.x, self.state.pos.y
         new_x = max(0, min(world.state.width - 1, self.state.pos.x + dx))
         new_y = max(0, min(world.state.height - 1, self.state.pos.y + dy))
         self.state.pos.x = new_x
         self.state.pos.y = new_y
+        return (old_x != new_x or old_y != new_y)
