@@ -1,4 +1,4 @@
-from core.models import ResourceType, AgentState
+from core.models import ResourceType, AgentState, AgentStatus
 from typing import List, Dict, Any
 
 class Ledger:
@@ -23,16 +23,17 @@ class EconomyEngine:
         self.base_consumption = 0.5
         self.work_reward_credits = 2.0
         self.work_reward_data = 0.5
+        self.work_reward_materials = 0.2
 
     def process_consumption(self, agent_state: AgentState):
-        multiplier = 1.2 if agent_state.status == "working" else 1.0
+        multiplier = 1.5 if agent_state.status == AgentStatus.WORKING else 1.0
         usage = self.base_consumption * multiplier
         agent_state.energy_level = max(0.0, agent_state.energy_level - usage)
         if agent_state.energy_level <= 0:
-            agent_state.status = "exhausted"
+            agent_state.status = AgentStatus.EXHAUSTED
 
     def apply_work_effects(self, agent_state: AgentState):
-        """Standardizes how agents are rewarded for general city labor."""
         agent_state.inventory[ResourceType.CREDITS] += self.work_reward_credits
         agent_state.inventory[ResourceType.DATA] += self.work_reward_data
-        agent_state.status = "working"
+        agent_state.inventory[ResourceType.MATERIALS] += self.work_reward_materials
+        agent_state.status = AgentStatus.WORKING

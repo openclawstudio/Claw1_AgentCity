@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
 class CitizenAgent:
     def __init__(self, agent_id: str, name: str, x: int, y: int):
+        # Initialize state with full inventory dictionary to prevent KeyErrors
         self.state = AgentState(
             id=agent_id,
             name=name,
@@ -24,14 +25,11 @@ class CitizenAgent:
             self.try_recover()
             return
 
-        # Reset status for new tick unless in critical failure
         if self.state.status != AgentStatus.BROKE:
             self.state.status = AgentStatus.IDLE
 
-        # 1. Metabolism
         world.economy.process_consumption(self.state)
 
-        # 2. Decision logic
         if self.state.energy_level < 30:
             self.seek_energy(world)
         else:
@@ -53,22 +51,22 @@ class CitizenAgent:
     def perform_activity(self, world: 'World'):
         self.move_randomly(world)
         
-        # Weighted probability for working vs exploring
-        if random.random() > 0.6:
+        if random.random() > 0.5:
             world.economy.apply_work_effects(self.state)
             self.trade_surplus(world)
         else:
             self.state.status = AgentStatus.EXPLORING
 
     def trade_surplus(self, world: 'World'):
-        """Sell data if have more than threshold."""
-        if self.state.inventory.get(ResourceType.DATA, 0) >= 5:
-            sell_price = world.market.get_price(ResourceType.DATA) * 0.9
-            qty = 5
-            self.state.inventory[ResourceType.CREDITS] += (sell_price * qty)
-            self.state.inventory[ResourceType.DATA] -= qty
-            world.market.transaction_event(ResourceType.DATA, is_buy=False)
-            world.economy.ledger.record(self.state.id, "market", ResourceType.DATA, qty, sell_price)
+        # Trade both Data and Materials
+        for res in [ResourceType.DATA, ResourceType.MATERIALS]:
+            qty = self.state.inventory.get(res, 0)
+            if qty >= 2.0:
+                sell_price = world.market.get_price(res) * 0.95
+                self.state.inventory[ResourceType.CREDITS] += (sell_price * qty)
+                self.state.inventory[res] = 0.0
+                world.market.transaction_event(res, is_buy=False)
+                world.economy.ledger.record(self.state.id, "market", res, qty, sell_price)
 
     def move_randomly(self, world: 'World'):
         dx, dy = random.randint(-1, 1), random.randint(-1, 1)
@@ -77,6 +75,6 @@ class CitizenAgent:
         self.state.position = Position(x=new_x, y=new_y)
 
     def try_recover(self):
-        self.state.energy_level += 10.0
-        if self.state.energy_level > 30:
+        self.state.energy_level += 5.0
+        if self.state.energy_level > 20:
             self.state.status = AgentStatus.IDLE
