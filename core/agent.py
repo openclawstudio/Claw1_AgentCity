@@ -3,13 +3,13 @@ from core.models import Position, AgentState, Transaction, ZoneType
 from core.brain import Brain
 
 class Citizen:
-    # Simulation constants for easy balancing
-    ENERGY_DECAY = 0.5
-    WORK_REWARD = 5.0
-    WORK_COST = 2.0
-    REST_RECOVERY = 10.0
-    SOCIAL_COST = 2.0
-    SOCIAL_REWARD = 5.0
+    # Simulation constants for balancing
+    ENERGY_DECAY = 0.3
+    WORK_REWARD = 8.0
+    WORK_COST = 4.0
+    REST_RECOVERY = 15.0
+    SOCIAL_COST = 5.0
+    SOCIAL_REWARD = 10.0
 
     def __init__(self, name: str, x: int, y: int):
         self.id = str(uuid.uuid4())
@@ -19,26 +19,26 @@ class Citizen:
         self.brain = Brain()
 
     def step(self, world):
-        # 1. Decide action based on current state
+        # 1. Decide action
         action = self.brain.decide_action(self.state, world)
         
         # 2. Identify target
         target = self.brain.get_target_position(action, self.pos, world)
         
-        # 3. Move (Orthogonal movement only to match Manhattan logic)
+        # 3. Move
         self._move_towards(target)
 
-        # 4. Process environment interaction
-        current_zone = world.get_zone(self.pos)
-        self._process_zone_effects(current_zone, world)
+        # 4. Interact if arrived
+        if self.pos.x == target.x and self.pos.y == target.y:
+            current_zone = world.get_zone(self.pos)
+            self._process_zone_effects(current_zone, world)
         
         # 5. Natural State Decay
         self.state.energy = max(0.0, self.state.energy - self.ENERGY_DECAY)
         if self.state.energy <= 0:
-            self.state.happiness = max(0.0, self.state.happiness - 1.0)
+            self.state.happiness = max(0.0, self.state.happiness - 0.5)
 
     def _move_towards(self, target):
-        # Move one step at a time along axes
         if self.pos.x != target.x:
             self.pos.x += 1 if target.x > self.pos.x else -1
         elif self.pos.y != target.y:
@@ -46,7 +46,6 @@ class Citizen:
 
     def _process_zone_effects(self, zone, world):
         if zone == ZoneType.INDUSTRIAL:
-            # Labor: Earn currency at the cost of energy
             self.state.wallet.balance += self.WORK_REWARD
             self.state.energy = max(0.0, self.state.energy - self.WORK_COST)
             world.record_transaction(Transaction(
@@ -57,10 +56,8 @@ class Citizen:
                 timestamp=world.tick_counter
             ))
         elif zone == ZoneType.RESIDENTIAL:
-            # Rest: Recover energy
             self.state.energy = min(100.0, self.state.energy + self.REST_RECOVERY)
         elif zone == ZoneType.COMMERCIAL:
-            # Consumption: Spend currency for happiness
             if self.state.wallet.balance >= self.SOCIAL_COST:
                 self.state.wallet.balance -= self.SOCIAL_COST
                 self.state.happiness = min(100.0, self.state.happiness + self.SOCIAL_REWARD)
