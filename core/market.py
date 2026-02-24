@@ -15,17 +15,23 @@ class Market:
         self.match_orders(order.resource)
 
     def match_orders(self, resource: ResourceType):
+        # Get active orders for this resource
         buys = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.BUY], key=lambda x: x.price, reverse=True)
         sells = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.SELL], key=lambda x: x.price)
 
+        if not buys or not sells:
+            return
+
         for buy in buys:
-            if buy.quantity <= 0: continue
+            if buy.quantity <= 1e-6: continue
+            
             for sell in sells:
-                if sell.quantity <= 0 or buy.agent_id == sell.agent_id: continue
+                if sell.quantity <= 1e-6 or buy.agent_id == sell.agent_id:
+                    continue
                 
                 if buy.price >= sell.price:
                     traded_qty = min(buy.quantity, sell.quantity)
-                    clearing_price = sell.price # Seller's price is the clearing price
+                    clearing_price = sell.price
 
                     trade_record = {
                          "buyer_id": buy.agent_id,
@@ -36,6 +42,7 @@ class Market:
                          "bid_price": buy.price
                     }
                     
+                    # Execute callbacks (e.g., world settlement)
                     for callback in self.on_trade_executed:
                         callback(trade_record)
 
@@ -43,11 +50,18 @@ class Market:
                     buy.quantity -= traded_qty
                     sell.quantity -= traded_qty
 
-                    if buy.quantity <= 0.001: break
+                    if buy.quantity <= 1e-6: 
+                        break
 
+        # Cleanup exhausted orders
         self.order_book[resource] = [
-            o for o in self.order_book[resource] if o.quantity > 0.001
+            o for o in self.order_book[resource] if o.quantity > 1e-6
         ]
         
+        # Rotate history
         if len(self.transaction_history) > 1000:
             self.transaction_history = self.transaction_history[-500:]
+
+    def get_average_price(self, resource: ResourceType, window: int = 10):
+        recent = [t['price'] for t in self.transaction_history if t['resource'] == resource][-window:]
+        return sum(recent) / len(recent) if recent else None

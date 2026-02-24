@@ -4,7 +4,6 @@ from .models import AgentState, Profession, ResourceType, MarketOrder, OrderType
 
 class Citizen:
     def __init__(self, agent_id: str, x: int, y: int):
-        # Initialize inventory with all resource types to avoid KeyErrors
         inventory = {res: 0.0 for res in ResourceType}
         inventory[ResourceType.CURRENCY] = 100.0
         
@@ -31,9 +30,9 @@ class Citizen:
         if self.state.energy < 70:
             self.work(world)
         
-        # Financial recovery: Small baseline activity stipend
-        if self.state.inventory.get(ResourceType.CURRENCY, 0) < 5:
-             self.state.inventory[ResourceType.CURRENCY] += 0.1
+        # Financial recovery: Small baseline activity stipend to prevent total gridlock
+        if self.state.inventory.get(ResourceType.CURRENCY, 0) < 2.0:
+             self.state.inventory[ResourceType.CURRENCY] += 0.5
 
     def move(self, world):
         dx = random.choice([-1, 0, 1])
@@ -48,7 +47,6 @@ class Citizen:
 
         if tx['buyer_id'] == self.state.id:
             self.state.inventory[tx['resource']] += qty
-            # Refund the difference between bid escrow and actual clearing price
             bid_escrow = qty * tx['bid_price']
             refund = bid_escrow - actual_cost
             if refund > 0:
@@ -66,7 +64,7 @@ class Citizen:
         
         elif self.state.profession == Profession.REFINER:
             if self.state.inventory[ResourceType.MATERIALS] >= 5:
-                self.state.energy -= 1.0
+                self.state.energy -= 1.5
                 self.state.inventory[ResourceType.MATERIALS] -= 5.0
                 self.state.inventory[ResourceType.ENERGY] += 8.0
                 if self.state.inventory[ResourceType.ENERGY] > 15:
@@ -77,12 +75,14 @@ class Citizen:
     def consume_energy(self, world):
         if self.state.inventory.get(ResourceType.ENERGY, 0) >= 1:
             self.state.inventory[ResourceType.ENERGY] -= 1
-            self.state.energy = min(100.0, self.state.energy + 25.0)
+            self.state.energy = min(100.0, self.state.energy + 30.0)
         else:
-            self.place_market_order(world, ResourceType.ENERGY, OrderType.BUY, 2, 15.0)
+            # Try to buy energy if low
+            self.place_market_order(world, ResourceType.ENERGY, OrderType.BUY, 3, 15.0)
 
     def place_market_order(self, world, resource: ResourceType, side: OrderType, qty: float, price: float):
-        computed_price = max(1.0, price + random.uniform(-1, 1))
+        # Adaptive pricing: slightly random
+        computed_price = max(0.5, price + random.uniform(-1.5, 1.5))
         
         if side == OrderType.SELL:
             if self.state.inventory.get(resource, 0) < qty:
