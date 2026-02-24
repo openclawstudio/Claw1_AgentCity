@@ -39,7 +39,12 @@ class Citizen:
             self.state.current_goal = "SEEKING_WORK"
             job = market.job_board.take_job(self.id)
             if job:
-                self.work(job, economy, world)
+                if self.state.energy > job.energy_cost:
+                    self.work(job, economy, world)
+                else:
+                    # Not enough energy for this specific job, put it back or ignore
+                    market.job_board.post_job(job)
+                    self.state.current_goal = "TOO_TIRED_FOR_WORK"
             else:
                 self.move_randomly(world)
         else:
@@ -49,11 +54,15 @@ class Citizen:
 
     def move_randomly(self, world):
         # Safe removal from current location
-        current_cell = world.get_cell(self.state.pos)
-        if self.id in current_cell.agents:
-            current_cell.agents.remove(self.id)
+        try:
+            current_cell = world.get_cell(self.state.pos)
+            if self.id in current_cell.agents:
+                current_cell.agents.remove(self.id)
+        except (IndexError, AttributeError):
+            pass
         
-        dx, dy = random.choice([(0,1), (0,-1), (1,0), (-1,0)])
+        moves = [(0,1), (0,-1), (1,0), (-1,0), (0,0)]
+        dx, dy = random.choice(moves)
         new_x = max(0, min(world.width - 1, self.state.pos.x + dx))
         new_y = max(0, min(world.height - 1, self.state.pos.y + dy))
         self.state.pos = Position(x=new_x, y=new_y)
@@ -81,6 +90,10 @@ class Citizen:
             print(f"Agent {self.state.name} bought {res_type.value} for {cost}")
 
     def work(self, job: Job, economy: EconomyManager, world):
+        # Check energy one last time
+        if self.state.energy < job.energy_cost:
+            return
+            
         # Ensure agent is moved to the job site
         old_cell = world.get_cell(self.state.pos)
         if self.id in old_cell.agents:
