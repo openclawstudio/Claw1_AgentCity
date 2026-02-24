@@ -18,11 +18,15 @@ class Citizen:
         # 1. Metabolism: Constant energy drain
         self.state.energy = round(max(0, self.state.energy - 0.5), 2)
         
-        if self.state.energy <= 0:
-            self.recover_exhaustion(world)
-            return
+        # 2. Recovery logic if exhausted
+        if self.state.energy <= 0 or self.state.current_goal == "EXHAUSTED":
+            if self.state.energy < 100.0:
+                self.recover_exhaustion(world)
+                return
+            else:
+                self.state.current_goal = None
 
-        # 2. Decision Logic based on needs
+        # 3. Decision Logic based on needs
         if self.state.energy < 30:
             self.state.current_goal = "FIND_SHELTER"
             self.seek_energy(world)
@@ -35,7 +39,7 @@ class Citizen:
 
     def recover_exhaustion(self, world):
         """Agent is too tired to move, slowly recovers energy."""
-        self.state.energy = round(min(100.0, self.state.energy + 5.0), 2)
+        self.state.energy = round(min(100.0, self.state.energy + 10.0), 2)
         self.state.current_goal = "EXHAUSTED"
 
     def wander(self, world):
@@ -50,18 +54,18 @@ class Citizen:
         if current_zone == "RESIDENTIAL":
             cost = world.economy.get_market_price("ENERGY")
             if self.state.wallet >= cost:
-                self.state.wallet -= cost
+                self.state.wallet = round(self.state.wallet - cost, 2)
                 self.state.energy = min(100.0, self.state.energy + 40)
                 world.economy.record_transaction(
                     self.id, "HOUSING_CORP", cost, "ENERGY", world.state.tick
                 )
             else:
-                # Passive recovery if broke
-                self.state.energy = min(100.0, self.state.energy + 2.0)
+                # Passive recovery if broke (slower than buying)
+                self.state.energy = round(min(100.0, self.state.energy + 5.0), 2)
         else:
-            # Move Left towards Residential (0 to mid_x)
+            # Move towards Residential (Left side)
             dx = -1 if self.state.pos.x > 0 else 0
-            dy = 1 if self.state.pos.y < (world.state.height // 2) else -1
+            dy = random.choice([-1, 0, 1])
             self._move_clamped(world, dx, dy)
 
     def seek_commerce(self, world):
@@ -69,20 +73,18 @@ class Citizen:
         current_zone = world.get_district_at(self.state.pos.x, self.state.pos.y)
         if current_zone == "COMMERCIAL":
             wage = world.economy.get_market_price("COMMERCE")
-            self.state.wallet += wage
+            self.state.wallet = round(self.state.wallet + wage, 2)
             self.state.energy = round(max(0, self.state.energy - 1.0), 2)
             world.economy.record_transaction(
                 "MARKET", self.id, wage, "CREDITS", world.state.tick
             )
         else:
-            # Move Right towards Commercial (mid_x to width)
+            # Move towards Commercial (Right side)
             dx = 1 if self.state.pos.x < world.state.width - 1 else 0
-            dy = 1 if self.state.pos.y < (world.state.height // 2) else -1
+            dy = random.choice([-1, 0, 1])
             self._move_clamped(world, dx, dy)
 
     def _move_clamped(self, world, dx: int, dy: int):
         """Internal helper to move agent within world bounds."""
-        new_x = max(0, min(world.state.width - 1, self.state.pos.x + dx))
-        new_y = max(0, min(world.state.height - 1, self.state.pos.y + dy))
-        self.state.pos.x = new_x
-        self.state.pos.y = new_y
+        self.state.pos.x = max(0, min(world.state.width - 1, self.state.pos.x + dx))
+        self.state.pos.y = max(0, min(world.state.height - 1, self.state.pos.y + dy))
