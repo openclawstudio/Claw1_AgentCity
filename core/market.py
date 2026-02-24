@@ -19,25 +19,23 @@ class Market:
         sells = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.SELL], key=lambda x: x.price)
 
         for buy in buys:
-            if buy.quantity <= 0:
-                continue
+            if buy.quantity <= 0: continue
             for sell in sells:
-                if sell.quantity <= 0 or buy.agent_id == sell.agent_id:
-                    continue
+                if sell.quantity <= 0 or buy.agent_id == sell.agent_id: continue
                 
                 if buy.price >= sell.price:
                     traded_qty = min(buy.quantity, sell.quantity)
-                    clearing_price = sell.price
+                    clearing_price = sell.price # Seller's price is the clearing price
 
                     trade_record = {
-                        "buyer_id": buy.agent_id,
-                        "seller_id": sell.agent_id,
-                        "resource": resource,
-                        "quantity": traded_qty,
-                        "price": clearing_price
+                         "buyer_id": buy.agent_id,
+                         "seller_id": sell.agent_id,
+                         "resource": resource,
+                         "quantity": traded_qty,
+                         "price": clearing_price,
+                         "bid_price": buy.price
                     }
                     
-                    # Execute callbacks
                     for callback in self.on_trade_executed:
                         callback(trade_record)
 
@@ -45,10 +43,8 @@ class Market:
                     buy.quantity -= traded_qty
                     sell.quantity -= traded_qty
 
-                    if buy.quantity <= 0:
-                        break
+                    if buy.quantity <= 0.001: break
 
-        # Cleanup book: Keep only orders with remaining quantity
         self.order_book[resource] = [
             o for o in self.order_book[resource] if o.quantity > 0.001
         ]

@@ -31,9 +31,9 @@ class Citizen:
         if self.state.energy < 70:
             self.work(world)
         
-        # Financial recovery: Survival stipend
+        # Financial recovery: Small baseline activity stipend
         if self.state.inventory.get(ResourceType.CURRENCY, 0) < 5:
-             self.state.inventory[ResourceType.CURRENCY] += 1.0
+             self.state.inventory[ResourceType.CURRENCY] += 0.1
 
     def move(self, world):
         dx = random.choice([-1, 0, 1])
@@ -42,25 +42,23 @@ class Citizen:
         self.state.pos_y = max(0, min(world.height - 1, self.state.pos_y + dy))
 
     def handle_trade_event(self, tx):
-        """Called by Market via World. Resources are reconciled here."""
+        """Reconcile balances after trade success."""
         qty = tx['quantity']
-        total_cost = qty * tx['price']
+        actual_cost = qty * tx['price']
 
         if tx['buyer_id'] == self.state.id:
-            # Buyer gets the resource. Currency was already 'escrowed' or checked.
             self.state.inventory[tx['resource']] += qty
-            # Since we now deduct currency AT THE MOMENT of order placement (escrow),
-            # we only handle refunds here if the clearing price was lower than bid.
-            # For simplicity in this MVP, we deduct actual cost here and check balance during order.
-            self.state.inventory[ResourceType.CURRENCY] -= total_cost
+            # Refund the difference between bid escrow and actual clearing price
+            bid_escrow = qty * tx['bid_price']
+            refund = bid_escrow - actual_cost
+            if refund > 0:
+                self.state.inventory[ResourceType.CURRENCY] += refund
 
         elif tx['seller_id'] == self.state.id:
-            # Seller gets the cash. Resource was already removed during order placement.
-            self.state.inventory[ResourceType.CURRENCY] += total_cost
+            self.state.inventory[ResourceType.CURRENCY] += actual_cost
 
     def work(self, world):
         if self.state.profession == Profession.EXTRACTOR:
-            # Costs 1 energy to produce 2 materials
             self.state.energy -= 1.0
             self.state.inventory[ResourceType.MATERIALS] += 2.0
             if self.state.inventory[ResourceType.MATERIALS] >= 10:
@@ -84,19 +82,17 @@ class Citizen:
             self.place_market_order(world, ResourceType.ENERGY, OrderType.BUY, 2, 15.0)
 
     def place_market_order(self, world, resource: ResourceType, side: OrderType, qty: float, price: float):
-        computed_price = max(1.0, price + random.uniform(-2, 2))
+        computed_price = max(1.0, price + random.uniform(-1, 1))
         
         if side == OrderType.SELL:
             if self.state.inventory.get(resource, 0) < qty:
                 return
-            # Escrow: remove from inventory immediately
             self.state.inventory[resource] -= qty
         else:
-            # Check if can afford the bid
-            if self.state.inventory.get(ResourceType.CURRENCY, 0) < (qty * computed_price):
+            total_bid = qty * computed_price
+            if self.state.inventory.get(ResourceType.CURRENCY, 0) < total_bid:
                 return
-            # We don't escrow currency here to prevent complex refund logic for now,
-            # but we checked the balance. The World settlement handles the swap.
+            self.state.inventory[ResourceType.CURRENCY] -= total_bid
 
         order = MarketOrder(
             id=str(uuid.uuid4()),
