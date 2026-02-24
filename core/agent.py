@@ -8,18 +8,14 @@ class Citizen:
             id=agent_id, 
             pos_x=x, 
             pos_y=y,
-            profession=random.choice(list(Profession))
+            profession=random.choice([p for p in Profession if p != Profession.UNEMPLOYED])
         )
 
     def step(self, world):
         # 1. Energy lifecycle
         self.state.energy -= 1.0
         
-        # 2. Process Market Outcomes (Basic Settlement Simulation)
-        # Note: In a full system, the Market would call a callback or transfer funds
-        self._settle_trades(world)
-
-        # 3. Decision Logic
+        # 2. Decision Logic
         if self.state.energy < 20:
             self.buy_energy(world)
         elif self.state.energy < 50:
@@ -27,19 +23,14 @@ class Citizen:
         else:
             self.work(world)
 
-    def _settle_trades(self, world):
-        """Process transactions from the world history involving this agent."""
-        for tx in world.market.transaction_history[-10:]: # Look at recent trades
-            if tx['buyer_id'] == self.state.id:
-                # Agent bought something
-                cost = tx['quantity'] * tx['price']
-                self.state.inventory[tx['resource']] = self.state.inventory.get(tx['resource'], 0) + tx['quantity']
-                self.state.inventory[ResourceType.CURRENCY] -= cost
-            elif tx['seller_id'] == self.state.id:
-                # Agent sold something
-                revenue = tx['quantity'] * tx['price']
-                self.state.inventory[ResourceType.CURRENCY] += revenue
-                # Inventory was already 'reserved' or removed during order placement in this MVP
+    def handle_trade_event(self, tx):
+        """Called by Market via World when a trade occurs."""
+        if tx['buyer_id'] == self.state.id:
+            self.state.inventory[tx['resource']] = self.state.inventory.get(tx['resource'], 0) + tx['quantity']
+            self.state.inventory[ResourceType.CURRENCY] -= tx['quantity'] * tx['price']
+        elif tx['seller_id'] == self.state.id:
+            self.state.inventory[ResourceType.CURRENCY] += tx['quantity'] * tx['price']
+            # Inventory was already deducted when placing sell order
 
     def work(self, world):
         if self.state.profession == Profession.EXTRACTOR:
@@ -59,17 +50,22 @@ class Citizen:
             self.state.energy += 20
             self.state.inventory[ResourceType.ENERGY] -= 1
         else:
-            self.place_market_order(world, ResourceType.ENERGY, OrderType.BUY, 1, 15.0)
+            # Try to buy energy if we have money
+            if self.state.inventory.get(ResourceType.CURRENCY, 0) >= 15:
+                self.place_market_order(world, ResourceType.ENERGY, OrderType.BUY, 1, 15.0)
 
     def seek_rest(self, world):
         self.state.energy += 5
 
     def place_market_order(self, world, resource: ResourceType, side: OrderType, qty: float, price: float):
-        # Resource validation
+        # Validate funds/inventory before placing order
         if side == OrderType.SELL:
-            available = self.state.inventory.get(resource, 0)
-            if available < qty: return
+            if self.state.inventory.get(resource, 0) < qty:
+                return
             self.state.inventory[resource] -= qty
+        else:
+            if self.state.inventory.get(ResourceType.CURRENCY, 0) < (qty * price):
+                return
 
         order = MarketOrder(
             id=str(uuid.uuid4()),
@@ -77,7 +73,7 @@ class Citizen:
             resource=resource,
             order_type=side,
             quantity=qty,
-            price=price + random.uniform(-1, 1),
+            price=max(0.1, price + random.uniform(-1, 1)),
             timestamp=world.ticks
         )
         world.market.place_order(order)
