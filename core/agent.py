@@ -1,6 +1,6 @@
 import random
 from typing import TYPE_CHECKING
-from core.models import AgentState, ResourceType, Position
+from core.models import AgentState, ResourceType, Position, AgentStatus
 
 if TYPE_CHECKING:
     from core.world import World
@@ -20,13 +20,13 @@ class CitizenAgent:
         )
 
     def step(self, world: 'World'):
-        if self.state.status == "exhausted":
+        if self.state.status == AgentStatus.EXHAUSTED:
             self.try_recover()
             return
 
-        # Reset status for new tick unless specialized
-        if self.state.status not in ["exhausted", "broke"]:
-            self.state.status = "idle"
+        # Reset status for new tick unless in critical failure
+        if self.state.status != AgentStatus.BROKE:
+            self.state.status = AgentStatus.IDLE
 
         # 1. Metabolism
         world.economy.process_consumption(self.state)
@@ -44,31 +44,31 @@ class CitizenAgent:
         if credits >= price:
             self.state.inventory[ResourceType.CREDITS] -= price
             self.state.energy_level = min(100.0, self.state.energy_level + 25)
-            self.state.status = "refueling"
-            # Record: Agent pays Market for Energy
+            self.state.status = AgentStatus.REFUELING
             world.economy.ledger.record(self.state.id, "market", ResourceType.ENERGY, 1, price)
             world.market.transaction_event(ResourceType.ENERGY, is_buy=True)
         else:
-            self.state.status = "broke"
+            self.state.status = AgentStatus.BROKE
 
     def perform_activity(self, world: 'World'):
         self.move_randomly(world)
         
-        # Economic logic: Work and Trade
-        if random.random() > 0.7:
+        # Weighted probability for working vs exploring
+        if random.random() > 0.6:
             world.economy.apply_work_effects(self.state)
-            
-            # Sell surplus data
-            if self.state.inventory[ResourceType.DATA] >= 5:
-                sell_price = world.market.get_price(ResourceType.DATA) * 0.8
-                qty = 5
-                self.state.inventory[ResourceType.CREDITS] += (sell_price * qty)
-                self.state.inventory[ResourceType.DATA] -= qty
-                world.market.transaction_event(ResourceType.DATA, is_buy=False)
-                # Record: Agent sells to Market
-                world.economy.ledger.record(self.state.id, "market", ResourceType.DATA, qty, sell_price)
+            self.trade_surplus(world)
         else:
-            self.state.status = "exploring"
+            self.state.status = AgentStatus.EXPLORING
+
+    def trade_surplus(self, world: 'World'):
+        """Sell data if have more than threshold."""
+        if self.state.inventory.get(ResourceType.DATA, 0) >= 5:
+            sell_price = world.market.get_price(ResourceType.DATA) * 0.9
+            qty = 5
+            self.state.inventory[ResourceType.CREDITS] += (sell_price * qty)
+            self.state.inventory[ResourceType.DATA] -= qty
+            world.market.transaction_event(ResourceType.DATA, is_buy=False)
+            world.economy.ledger.record(self.state.id, "market", ResourceType.DATA, qty, sell_price)
 
     def move_randomly(self, world: 'World'):
         dx, dy = random.randint(-1, 1), random.randint(-1, 1)
@@ -77,6 +77,6 @@ class CitizenAgent:
         self.state.position = Position(x=new_x, y=new_y)
 
     def try_recover(self):
-        self.state.energy_level += 5.0
+        self.state.energy_level += 10.0
         if self.state.energy_level > 30:
-            self.state.status = "idle"
+            self.state.status = AgentStatus.IDLE

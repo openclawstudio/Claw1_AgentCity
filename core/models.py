@@ -8,6 +8,14 @@ class ResourceType(str, Enum):
     MATERIALS = "materials"
     CREDITS = "credits"
 
+class AgentStatus(str, Enum):
+    IDLE = "idle"
+    WORKING = "working"
+    REFUELING = "refueling"
+    EXHAUSTED = "exhausted"
+    BROKE = "broke"
+    EXPLORING = "exploring"
+
 class Position(BaseModel):
     x: int
     y: int
@@ -23,7 +31,7 @@ class AgentState(BaseModel):
         ResourceType.CREDITS: 0.0
     })
     energy_level: float = 100.0
-    status: str = "idle"
+    status: AgentStatus = AgentStatus.IDLE
 
 class WorldState(BaseModel):
     tick: int
