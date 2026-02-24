@@ -12,6 +12,11 @@ class Position(BaseModel):
     x: int
     y: int
 
+    def __eq__(self, other):
+        if not isinstance(other, Position):
+            return False
+        return self.x == other.x and self.y == other.y
+
 class Wallet(BaseModel):
     balance: float = 0.0
     currency: str = "CLAW"
@@ -24,7 +29,7 @@ class AgentState(BaseModel):
     energy: float = 100.0
     happiness: float = 100.0
     wallet: Wallet = Field(default_factory=Wallet)
-    inventory: List[Resource] = []
+    inventory: List[Resource] = Field(default_factory=list)
     current_job: Optional[str] = None
 
 class Transaction(BaseModel):

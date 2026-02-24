@@ -4,12 +4,12 @@ from core.brain import Brain
 
 class Citizen:
     # Simulation constants for balancing
-    ENERGY_DECAY = 0.3
-    WORK_REWARD = 8.0
-    WORK_COST = 4.0
-    REST_RECOVERY = 15.0
+    ENERGY_DECAY = 0.5
+    WORK_REWARD = 12.0
+    WORK_COST = 5.0
+    REST_RECOVERY = 20.0
     SOCIAL_COST = 5.0
-    SOCIAL_REWARD = 10.0
+    SOCIAL_REWARD = 15.0
 
     def __init__(self, name: str, x: int, y: int):
         self.id = str(uuid.uuid4())
@@ -25,20 +25,21 @@ class Citizen:
         # 2. Identify target
         target = self.brain.get_target_position(action, self.pos, world)
         
-        # 3. Move
-        self._move_towards(target)
-
-        # 4. Interact if arrived
-        if self.pos.x == target.x and self.pos.y == target.y:
+        # 3. Move towards target (if not already there)
+        if self.pos != target:
+            self._move_towards(target)
+        else:
+            # 4. Interact if arrived
             current_zone = world.get_zone(self.pos)
             self._process_zone_effects(current_zone, world)
         
         # 5. Natural State Decay
         self.state.energy = max(0.0, self.state.energy - self.ENERGY_DECAY)
         if self.state.energy <= 0:
-            self.state.happiness = max(0.0, self.state.happiness - 0.5)
+            self.state.happiness = max(0.0, self.state.happiness - 1.0)
 
-    def _move_towards(self, target):
+    def _move_towards(self, target: Position):
+        # Simple Manhattan movement
         if self.pos.x != target.x:
             self.pos.x += 1 if target.x > self.pos.x else -1
         elif self.pos.y != target.y:
