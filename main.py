@@ -1,10 +1,11 @@
 import time
+import random
+import uuid
 from core.world import World
 from core.agent import Citizen
 from core.market import Market
 from core.economy import EconomyManager
 from core.models import Position, Job
-import uuid
 
 def run_simulation():
     print("--- Starting AgentCity MVP ---")
@@ -13,10 +14,13 @@ def run_simulation():
     economy = EconomyManager()
     
     # Spawn agents
-    citizens = [
-        Citizen(f"Agent_{i}", Position(x=random.randint(0,9), y=random.randint(0,9)))
-        for i in range(5)
-    ]
+    citizens = []
+    for i in range(5):
+        pos = Position(x=random.randint(0,9), y=random.randint(0,9))
+        agent = Citizen(f"Agent_{i}", pos)
+        citizens.append(agent)
+        # Register agent in world cell
+        world.get_cell(pos).agents.append(agent.id)
 
     # Add initial liquidity/jobs
     market.job_board.post_job(Job(
@@ -30,10 +34,12 @@ def run_simulation():
 
     try:
         for tick in range(50):
-            print(f"\nTick {tick} | GDP: {economy.global_gdp}")
+            world.tick()
+            print(f"\nTick {tick} | GDP: {economy.global_gdp:.2f} | Jobs Available: {len(market.job_board.available_jobs)}")
+            
             for agent in citizens:
                 agent.step(market, economy, world)
-                print(f"{agent.state.name}: Energy={agent.state.energy}, Balance={agent.state.balance}")
+                print(f"[{agent.state.current_goal}] {agent.state.name}: Energy={agent.state.energy:.1f}, Balance={agent.state.balance:.1f}")
             
             # Periodic job injection
             if tick % 5 == 0:
@@ -43,10 +49,9 @@ def run_simulation():
                     location=Position(x=random.randint(0,9), y=random.randint(0,9))
                 ))
             
-            time.sleep(0.5)
+            time.sleep(0.3)
     except KeyboardInterrupt:
-        print("Simulation stopped.")
+        print("\nSimulation stopped.")
 
-import random
 if __name__ == "__main__":
     run_simulation()
