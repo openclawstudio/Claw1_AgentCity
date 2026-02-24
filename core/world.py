@@ -10,6 +10,7 @@ class World:
         self.height = height
         self.zones: Dict[Tuple[int, int], ZoneType] = {}
         self.agents = []
+        self.agent_map = {}
         self.tick_count = 0
         self.economy = EconomyManager()
         self.market = Market()
@@ -27,7 +28,18 @@ class World:
     def get_zone(self, pos: Tuple[int, int]) -> ZoneType:
         return self.zones.get(pos, ZoneType.EMPTY)
 
+    def get_zones_by_type(self, zone_type: ZoneType) -> List[Tuple[int, int]]:
+        return [pos for pos, zt in self.zones.items() if zt == zone_type]
+
     def step(self):
         self.tick_count += 1
+        # Update fast-lookup map
+        self.agent_map = {a.id: a for a in self.agents if a.alive}
+        
+        # Perform actions
         for agent in self.agents:
-            agent.step(self)
+            if agent.alive:
+                agent.step(self)
+        
+        # Cleanup dead agents from active list
+        self.agents = [a for a in self.agents if a.alive]
