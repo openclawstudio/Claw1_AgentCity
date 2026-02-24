@@ -1,5 +1,6 @@
 import random
 import math
+from typing import Any, Optional
 from .models import AgentState, Position, ResourceType
 
 class Citizen:
@@ -15,7 +16,7 @@ class Citizen:
     def balance(self, value):
         self.state.balance = value
 
-    def step(self, world):
+    def step(self, world: Any):
         """Advance the agent's state by one tick."""
         if self.state.energy <= 0:
             return
@@ -36,7 +37,8 @@ class Citizen:
         return math.sqrt((pos1.x - pos2.x)**2 + (pos1.y - pos2.y)**2)
 
     def _wander(self, world):
-        dx, dy = random.choice([(0,1), (0,-1), (1,0), (-1,0)])
+        directions = [(0,1), (0,-1), (1,0), (-1,0)]
+        dx, dy = random.choice(directions)
         new_x = max(0, min(world.width - 1, self.state.pos.x + dx))
         new_y = max(0, min(world.height - 1, self.state.pos.y + dy))
         self.state.pos.x = new_x
@@ -45,29 +47,41 @@ class Citizen:
     def _seek_resource(self, world, resource_type: str):
         targets = [b for b in world.businesses if b.business_type == "grocery"]
         if not targets:
-            # Emergency fallback: buy from air at high cost if no businesses exist
             if self.balance >= 15:
                 self.balance -= 15
                 self.state.energy += 30
             return
 
-        # Find nearest business
         nearest = min(targets, key=lambda b: self._get_distance(self.state.pos, b.pos))
         
-        if self._get_distance(self.state.pos, nearest.pos) <= 1.0:
+        if self._get_distance(self.state.pos, nearest.pos) <= 1.5:
             price = world.marketplace.resource_prices.get(resource_type, 10.0)
             if world.economy.transfer(self, nearest, price, ResourceType.FOOD, world.tick_count):
-                self.state.energy += 50
+                self.state.energy = min(100.0, self.state.energy + 50)
         else:
             self._move_towards(nearest.pos)
 
     def _work(self, world):
-        # Simple labor logic: agents can work at any business to earn credits
+        # Utilize the marketplace jobs if available
+        jobs = world.marketplace.get_available_jobs()
+        
+        if jobs:
+            # Try to go to employer location
+            job = jobs[0]
+            employer = next((b for b in world.businesses if b.id == job.employer_id), None)
+            if employer:
+                if self._get_distance(self.state.pos, employer.pos) <= 1.5:
+                    if world.economy.transfer(employer, self, job.salary, ResourceType.CREDITS, world.tick_count):
+                        self.state.energy -= 10
+                else:
+                    self._move_towards(employer.pos)
+                return
+
+        # Fallback to general labor at first available business if no specific jobs posted
         if world.businesses:
             target = world.businesses[0]
-            if self._get_distance(self.state.pos, target.pos) <= 1.0:
-                # Generate value for the city
-                wage = 10.0
+            if self._get_distance(self.state.pos, target.pos) <= 1.5:
+                wage = 5.0
                 world.economy.transfer(target, self, wage, ResourceType.CREDITS, world.tick_count)
                 self.state.energy -= 5
             else:
