@@ -50,15 +50,17 @@ class CitizenAgent:
             self._move_towards(target.pos)
 
     def _move_towards(self, target_pos: Position):
+        # Move in X and Y simultaneously to allow diagonal movement
         if self.state.pos.x < target_pos.x: self.state.pos.x += 1
         elif self.state.pos.x > target_pos.x: self.state.pos.x -= 1
-        elif self.state.pos.y < target_pos.y: self.state.pos.y += 1
+        
+        if self.state.pos.y < target_pos.y: self.state.pos.y += 1
         elif self.state.pos.y > target_pos.y: self.state.pos.y -= 1
         
         self.state.energy = max(0.0, self.state.energy - 0.5)
 
     def _random_move(self, w: int, h: int):
-        dx, dy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (0,0)])
+        dx, dy = random.choice([(-1,0), (1,0), (0,-1), (0,1), (1,1), (-1,-1), (0,0)])
         self.state.pos.x = max(0, min(w - 1, self.state.pos.x + dx))
         self.state.pos.y = max(0, min(h - 1, self.state.pos.y + dy))
         self.state.energy = max(0.0, self.state.energy - 0.2)
