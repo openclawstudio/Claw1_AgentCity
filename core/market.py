@@ -12,14 +12,23 @@ class Market:
         self.offers[offer_id] = offer
         return offer_id
 
-    def fulfill_offer(self, offer_id: str, buyer) -> bool:
+    def fulfill_offer(self, offer_id: str, buyer, world_agents: list) -> bool:
         if offer_id not in self.offers:
             return False
+        
         offer = self.offers[offer_id]
+        seller = next((a for a in world_agents if a.id == offer.creator_id), None)
+        
+        if not seller:
+            return False
+
         if buyer.state.wallet >= offer.price:
             buyer.state.wallet -= offer.price
+            seller.state.wallet += offer.price
+            
             buyer.state.inventory[offer.item] = buyer.state.inventory.get(offer.item, 0) + offer.quantity
-            # In a real impl, we'd credit the seller too here
+            # Logic assumes seller already has the item or it's a service
+            
             del self.offers[offer_id]
             return True
         return False

@@ -1,6 +1,8 @@
 import random
 from typing import Dict, Tuple, List
 from .models import ZoneType
+from .economy import EconomyManager
+from .market import Market
 
 class World:
     def __init__(self, width: int, height: int):
@@ -9,6 +11,8 @@ class World:
         self.zones: Dict[Tuple[int, int], ZoneType] = {}
         self.agents = []
         self.tick_count = 0
+        self.economy = EconomyManager()
+        self.market = Market()
         self._initialize_zones()
 
     def _initialize_zones(self):
