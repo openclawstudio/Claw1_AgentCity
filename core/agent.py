@@ -5,7 +5,14 @@ class Citizen:
     def __init__(self, agent_id: str, pos: Position):
         self.state = AgentState(id=agent_id, pos=pos)
         self.id = agent_id
-        self.balance = self.state.balance
+
+    @property
+    def balance(self):
+        return self.state.balance
+
+    @balance.setter
+    def balance(self, value):
+        self.state.balance = value
 
     def step(self, world):
         # Decrease energy every tick
@@ -24,9 +31,12 @@ class Citizen:
         self.state.pos.y = new_y
 
     def _seek_food(self, world):
-        # Dummy logic: if near a business, buy food
-        price = world.marketplace.resource_prices["food"]
+        # Logic: Find a provider and purchase food
+        price = world.marketplace.resource_prices.get("food", 10.0)
         if self.balance >= price:
+            # In a real simulation, this would be a transfer to a Business entity
             self.balance -= price
             self.state.energy += 40
-            print(f"Agent {self.id} bought food. Energy: {self.state.energy}")
+            # Record tax if applicable via world economy later
+            world.economy.treasury += price * world.economy.tax_rate
+            print(f"Agent {self.id} bought food. Energy: {self.state.energy:.1f}")
