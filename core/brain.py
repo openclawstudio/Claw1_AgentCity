@@ -7,15 +7,21 @@ class Brain:
         self.current_intention = None
 
     def decide_action(self, state, world):
-        # Prioritize survival: Energy > Wealth > Social
-        if state.energy < 25:
+        # Logic to clear intention if satisfied
+        if self.current_intention == "rest" and state.energy > 90:
+            self.current_intention = None
+        elif self.current_intention == "work" and state.wallet.balance > 50:
+            self.current_intention = None
+        elif self.current_intention == "socialize" and state.happiness > 90:
+            self.current_intention = None
+
+        # Priority selection
+        if state.energy < 30:
             self.current_intention = "rest"
-        elif state.wallet.balance < 5:
+        elif state.wallet.balance < 10:
             self.current_intention = "work"
-        elif state.energy > 60 and state.wallet.balance > 20:
-            self.current_intention = "socialize"
         elif not self.current_intention:
-            self.current_intention = "socialize"
+            self.current_intention = random.choice(["socialize", "work", "rest"])
             
         return self.current_intention
 
@@ -26,6 +32,4 @@ class Brain:
             "socialize": ZoneType.COMMERCIAL
         }
         target_zone = action_map.get(action, ZoneType.RESIDENTIAL)
-        
-        # Delegate spatial lookup to world layer (optimized cache)
         return world.get_nearest_zone(current_pos, target_zone)

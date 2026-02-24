@@ -20,6 +20,9 @@ class Position(BaseModel):
     def __hash__(self):
         return hash((self.x, self.y))
 
+    def __str__(self):
+        return f"({self.x}, {self.y})"
+
 class Wallet(BaseModel):
     balance: float = 0.0
     currency: str = "CLAW"
