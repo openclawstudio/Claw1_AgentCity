@@ -49,28 +49,28 @@ class Agent:
         current_zone = world.get_zone(self.state.pos)
         
         if current_zone == ZoneType.INDUSTRIAL:
-            if self.state.energy > 40:
+            # Buffering energy to prevent immediate death
+            if self.state.energy > 10.0:
                 self.state.inventory["resource"] = self.state.inventory.get("resource", 0) + 1
                 self.state.energy -= 5.0
-                # Only post if not already heavily listed
                 existing_offers = [o for o in world.market.offers.values() if o.creator_id == self.id]
                 if len(existing_offers) < 3:
                     world.market.post_offer(self.id, "resource", 15.0, 1, self.state.inventory)
 
         elif current_zone == ZoneType.COMMERCIAL:
-            # Working for cash
-            self.state.wallet += 5.0
-            self.state.energy -= 2.0
+            if self.state.energy > 5.0:
+                self.state.wallet += 5.0
+                self.state.energy -= 2.0
 
         elif current_zone == ZoneType.RESIDENTIAL:
             if self.state.energy < 100:
-                self.state.energy = min(100.0, self.state.energy + 10.0)
+                self.state.energy = min(100.0, self.state.energy + 15.0)
 
-        # 4. Market Interaction (Buy resource to restore energy)
+        # 4. Market Interaction
         if self.state.energy < 50 and self.state.wallet >= 15:
             resource_offers = [oid for oid, o in world.market.offers.items() if o.item == "resource" and o.creator_id != self.id]
             if resource_offers:
-                # Attempt to fulfill the first available offer
+                # Use the current world agent map which is updated at start of world.step
                 if world.market.fulfill_offer(resource_offers[0], self, world.agent_map, world.tick_count, world.economy):
                     if self.state.inventory.get("resource", 0) > 0:
                         self.state.inventory["resource"] -= 1
