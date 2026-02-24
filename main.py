@@ -20,11 +20,16 @@ def main():
             # Simple CLI Dashboard
             if city.tick_counter % 2 == 0:
                 # clear_screen()
-                avg_energy = sum(a.state.energy for a in city.agents.values()) / max(1, len(city.agents))
-                total_wealth = sum(a.state.balance for a in city.agents.values()) + sum(b.vault for b in city.businesses.values())
+                pop_count = len(city.agents)
+                avg_energy = sum(a.state.energy for a in city.agents.values()) / max(1, pop_count)
+                
+                # Fix: Reference 'balance' instead of 'vault'
+                agent_wealth = sum(a.state.balance for a in city.agents.values())
+                biz_wealth = sum(b.balance for b in city.businesses.values())
+                total_wealth = agent_wealth + biz_wealth
                 
                 print(f"--- AgentCity Stats [Tick {city.tick_counter}] ---")
-                print(f"Population: {len(city.agents):<4} | Businesses: {len(city.businesses):<4}")
+                print(f"Population: {pop_count:<4} | Businesses: {len(city.businesses):<4}")
                 print(f"Avg Energy: {avg_energy:<4.1f} | Total GDP: {total_wealth:<6.2f}")
                 print("-" * 40)
             

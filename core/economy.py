@@ -1,5 +1,4 @@
 from typing import List, Dict, Any, Union, Protocol
-from .models import AgentState, BusinessState
 
 class Account(Protocol):
     id: str
@@ -15,19 +14,27 @@ class EconomySystem:
         self.job_board.append(job)
         return job
 
-    def transfer(self, sender: Account, receiver: Account, amount: float) -> bool:
+    def transfer(self, sender: Any, receiver: Any, amount: float) -> bool:
         """
         Safely transfers funds between accounts (Agents or Businesses).
+        Uses duck typing to ensure both objects have a 'balance' attribute.
         """
-        if amount <= 0 or sender.balance < amount:
+        if amount <= 0:
+            return False
+            
+        # Use getattr/setattr or direct access safely
+        if not hasattr(sender, 'balance') or not hasattr(receiver, 'balance'):
+            return False
+
+        if sender.balance < amount:
             return False
 
         sender.balance -= amount
         receiver.balance += amount
 
         self.transaction_history.append({
-            "from": sender.id, 
-            "to": receiver.id, 
+            "from": getattr(sender, 'id', 'unknown'), 
+            "to": getattr(receiver, 'id', 'unknown'), 
             "amount": amount
         })
         return True
