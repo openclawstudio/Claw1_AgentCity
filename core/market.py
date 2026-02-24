@@ -17,29 +17,36 @@ class Market:
         buys = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.BUY], key=lambda x: x.price, reverse=True)
         sells = sorted([o for o in self.order_book[resource] if o.order_type == OrderType.SELL], key=lambda x: x.price)
 
-        while buys and sells and buys[0].price >= sells[0].price:
-            buy = buys.pop(0)
-            sell = sells.pop(0)
-            
-            traded_qty = min(buy.quantity, sell.quantity)
-            price = sell.price # Seller's price is the clearing price
-            
-            # Logic for partial fills would go here, omitting for MVP brevity
-            self.transaction_history.append({
-                "buyer": buy.agent_id,
-                "seller": sell.agent_id,
-                "resource": resource,
-                "quantity": traded_qty,
-                "price": price
-            })
-            
-            # Clean up original order book
-            self.order_book[resource] = [o for o in self.order_book[resource] if o.id != buy.id and o.id != sell.id]
-            
-            # Handle leftovers
-            if buy.quantity > traded_qty:
-                buy.quantity -= traded_qty
-                self.order_book[resource].append(buy)
-            if sell.quantity > traded_qty:
-                sell.quantity -= traded_qty
-                self.order_book[resource].append(sell)
+        remaining_orders = []
+        
+        matched_buys = set()
+        matched_sells = set()
+
+        for buy in buys:
+            for sell in sells:
+                if sell.id in matched_sells or buy.id in matched_buys:
+                    continue
+                
+                if buy.price >= sell.price:
+                    traded_qty = min(buy.quantity, sell.quantity)
+                    clearing_price = sell.price
+
+                    self.transaction_history.append({
+                        "buyer_id": buy.agent_id,
+                        "seller_id": sell.agent_id,
+                        "resource": resource,
+                        "quantity": traded_qty,
+                        "price": clearing_price
+                    })
+
+                    buy.quantity -= traded_qty
+                    sell.quantity -= traded_qty
+
+                    if buy.quantity <= 0: matched_buys.add(buy.id)
+                    if sell.quantity <= 0: matched_sells.add(sell.id)
+
+        # Update order book with non-exhausted orders
+        self.order_book[resource] = [
+            o for o in self.order_book[resource] 
+            if o.id not in matched_buys and o.id not in matched_sells and o.quantity > 0
+        ]
