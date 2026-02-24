@@ -7,6 +7,7 @@ class Citizen:
         self.perception_radius = 5
 
     def step(self, world):
+        """Executes one simulation step for the agent."""
         # 1. Update Vitals
         self.state.energy -= 1.0
         
@@ -46,22 +47,27 @@ class Citizen:
             )
             
             if self.state.pos == target_biz.pos:
-                # Attempt transaction
-                if self.state.balance >= 10:
-                    self.state.balance -= 10
-                    self.state.energy = min(100.0, self.state.energy + 40)
-                    # In a real cycle, we would transfer to owner, but simplified for now
-                    target_biz.vault += 10
+                # Use Economy System for formal transfer
+                owner = world.agents.get(target_biz.owner_id)
+                cost = 15.0
+                energy_gain = 40.0
+                
+                if self.state.balance >= cost:
+                    success = world.economy.transfer(self.state, owner.state if owner else target_biz, cost)
+                    if success:
+                        self.state.energy = min(100.0, self.state.energy + energy_gain)
+                        if not owner: # If owner is gone, money goes to business vault
+                            target_biz.vault += cost
             else:
                 self._move_towards(world, target_biz.pos)
         else:
             self._random_move(world)
 
     def _become_entrepreneur(self, world):
-        # Deduct cost of starting business to prevent spam
-        setup_cost = 500
+        setup_cost = 500.0
         if self.state.balance >= setup_cost:
             self.state.balance -= setup_cost
             self.state.role = Role.ENTREPRENEUR
+            # Entrepreneurs also get a small starting inventory of energy to sell
             world.create_business(self.state.id, self.state.pos, "Energy Hub")
-            print(f"Agent {self.state.id} spent {setup_cost} to start an Energy Hub at {self.state.pos}!")
+            print(f"Agent {self.state.id} founded a business at {self.state.pos}")
