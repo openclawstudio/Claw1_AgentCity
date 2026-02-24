@@ -17,9 +17,9 @@ class World:
         self._initialize_zones()
 
     def _initialize_zones(self):
+        # Fill grid
         for x in range(self.width):
             for y in range(self.height):
-                # Deterministic but varied zoning
                 val = (x * 3 + y * 7)
                 if val % 10 == 0:
                     zt = ZoneType.COMMERCIAL
@@ -29,10 +29,9 @@ class World:
                     zt = ZoneType.OPEN_SPACE
                 else:
                     zt = ZoneType.RESIDENTIAL
-                
                 self.set_zone(x, y, zt)
         
-        # Safety check: Ensure at least one of each critical zone exists
+        # Ensure required infrastructure exists
         for zt in [ZoneType.RESIDENTIAL, ZoneType.COMMERCIAL, ZoneType.INDUSTRIAL]:
             if not self._zone_cache[zt]:
                 rx, ry = random.randint(0, self.width-1), random.randint(0, self.height-1)
@@ -43,7 +42,7 @@ class World:
         if old_zone == zone_type:
             return
         
-        if old_zone and (x, y) in self._zone_cache[old_zone]:
+        if old_zone in self._zone_cache and (x, y) in self._zone_cache[old_zone]:
             self._zone_cache[old_zone].remove((x, y))
             
         self.grid[(x, y)] = zone_type
@@ -55,9 +54,9 @@ class World:
     def get_nearest_zone(self, pos: Position, zone_type: ZoneType) -> Position:
         coords = self._zone_cache.get(zone_type, [])
         if not coords:
-            # Fallback to random if no zone exists (should not happen with safety check)
-            return Position(x=random.randint(0, self.width-1), y=random.randint(0, self.height-1))
+            return Position(x=0, y=0)
         
+        # Manhattan distance optimization
         best_coord = min(coords, key=lambda c: abs(c[0] - pos.x) + abs(c[1] - pos.y))
         return Position(x=best_coord[0], y=best_coord[1])
 

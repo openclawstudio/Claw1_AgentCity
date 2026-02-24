@@ -17,6 +17,9 @@ class Position(BaseModel):
             return False
         return self.x == other.x and self.y == other.y
 
+    def __hash__(self):
+        return hash((self.x, self.y))
+
 class Wallet(BaseModel):
     balance: float = 0.0
     currency: str = "CLAW"
@@ -31,6 +34,7 @@ class AgentState(BaseModel):
     wallet: Wallet = Field(default_factory=Wallet)
     inventory: List[Resource] = Field(default_factory=list)
     current_job: Optional[str] = None
+    status_message: str = "Idle"
 
 class Transaction(BaseModel):
     sender_id: str
