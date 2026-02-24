@@ -1,22 +1,22 @@
-from .models import BusinessState, Position
+import enum
+from core.models import Position
 
-class Business:
-    def __init__(self, business_id: str, pos: Position, business_type: str):
-        self.state = BusinessState(id=business_id, pos=pos, business_type=business_type)
-        self.id = business_id
+class BuildingType(enum.Enum):
+    HOME = "home"
+    OFFICE = "office"
+    MARKET = "market"
+    LAB = "lab"
 
-    @property
-    def balance(self):
-        return self.state.balance
+class Building:
+    def __init__(self, id: str, b_type: BuildingType, pos: Position):
+        self.id = id
+        self.type = b_type
+        self.pos = pos
+        self.occupants = []
 
-    @balance.setter
-    def balance(self, value):
-        self.state.balance = value
+    def enter(self, agent_id: str):
+        self.occupants.append(agent_id)
 
-    @property
-    def business_type(self):
-        return self.state.business_type
-
-    @property
-    def pos(self):
-        return self.state.pos
+    def exit(self, agent_id: str):
+        if agent_id in self.occupants:
+            self.occupants.remove(agent_id)

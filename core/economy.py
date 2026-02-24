@@ -1,28 +1,34 @@
-from typing import List
-from .models import Transaction, ResourceType
+import uuid
+from typing import List, Dict, Any
+from datetime import datetime
+from core.models import Transaction
 
-class Economy:
+class TransactionLedger:
     def __init__(self):
-        self.transaction_history: List[Transaction] = []
-        self.tax_rate = 0.05
-        self.treasury = 0.0
+        self.history: List[Transaction] = []
 
-    def transfer(self, sender, receiver, amount: float, resource: ResourceType, tick: int) -> bool:
-        if sender.balance >= amount:
-            tax = amount * self.tax_rate
-            net_amount = amount - tax
-            
-            sender.balance -= amount
-            receiver.balance += net_amount
-            self.treasury += tax
-            
-            tx = Transaction(
-                sender_id=sender.id, 
-                receiver_id=receiver.id, 
-                amount=amount, 
-                resource_type=resource, 
-                timestamp=tick
-            )
-            self.transaction_history.append(tx)
-            return True
-        return False
+    def record(self, sender: str, receiver: str, amount: float, purpose: str):
+        tx = Transaction(
+            id=str(uuid.uuid4()),
+            sender_id=sender,
+            receiver_id=receiver,
+            amount=amount,
+            purpose=purpose,
+            timestamp=datetime.now().isoformat()
+        )
+        self.history.append(tx)
+        return tx
+
+class EconomySystem:
+    def __init__(self):
+        self.ledger = TransactionLedger()
+        self.registry: Dict[str, List[str]] = {} # service_name -> [agent_ids]
+
+    def register_service(self, agent_id: str, service_name: str):
+        if service_name not in self.registry:
+            self.registry[service_name] = []
+        if agent_id not in self.registry[service_name]:
+            self.registry[service_name].append(agent_id)
+
+    def get_providers(self, service_name: str) -> List[str]:
+        return self.registry.get(service_name, [])

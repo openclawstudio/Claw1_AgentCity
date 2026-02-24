@@ -1,34 +1,40 @@
 import time
+import os
 from core.world import AgentCityWorld
+from core.agent import CitizenAgent
+from core.entity import Building, BuildingType
+from core.models import Position
 
-def main():
-    print("--- Starting AgentCity Simulation ---")
-    world = AgentCityWorld(width=15, height=15)
-    
-    # Setup Infrastructure
-    world.add_business("general_store", "grocery", 5, 5)
-    
-    # Spawn initial citizens
-    for i in range(8):
-        world.spawn_agent(f"agent_{i}")
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
+def run_simulation():
+    world = AgentCityWorld(30, 30)
+    
+    # Setup City Infrastructure
+    world.add_building(Building("h1", BuildingType.HOME, Position(x=2, y=2)))
+    world.add_building(Building("o1", BuildingType.OFFICE, Position(x=15, y=15)))
+    world.add_building(Building("m1", BuildingType.MARKET, Position(x=5, y=10)))
+
+    # Spawn Citizens
+    citizens = [
+        CitizenAgent("a1", "Alice", Position(x=0, y=0)),
+        CitizenAgent("a2", "Bob", Position(x=10, y=10))
+    ]
+    for c in citizens: world.add_agent(c)
+
+    print("Starting AgentCity MVP...")
     try:
-        while True:
-            world.update()
-            status = world.get_status()
-            print(f"Tick: {status['tick']} | Pop: {status['population']} | Treasury: {status['treasury']:.2f}")
-            
-            if status['tick'] % 5 == 0:
-                for a in world.agents[:3]: # Monitor first few agents
-                    print(f"  -> {a.id}: Energy {a.state.energy:.1f}, Balance {a.balance:.1f}, Pos ({a.state.pos.x},{a.state.pos.y})")
-            
-            if status['population'] == 0:
-                print("All agents have perished. Simulation over.")
-                break
-
+        for i in range(100):
+            world.step()
+            clear_screen()
+            stats = world.get_status()
+            print(f"--- AgentCity Tick {stats['tick']} ---")
+            for a in world.agents:
+                print(f"{a.state.name}: Pos({a.state.pos.x},{a.state.pos.y}) | Goal: {a.state.current_goal} | Energy: {a.state.energy:.1f} | Wealth: ${a.state.wealth}")
             time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nSimulation ended.")
+        print("\nSimulation Stopped.")
 
 if __name__ == "__main__":
-    main()
+    run_simulation()

@@ -1,98 +1,47 @@
 import random
-import math
-from typing import Any, Optional, TYPE_CHECKING
-from .models import AgentState, Position, ResourceType
+from core.models import AgentState, Position
 
-if TYPE_CHECKING:
-    from .world import AgentCityWorld
+class CitizenAgent:
+    def __init__(self, id: str, name: str, pos: Position):
+        self.state = AgentState(id=id, name=name, pos=pos)
+        self.services = []
 
-class Citizen:
-    def __init__(self, agent_id: str, pos: Position):
-        self.state = AgentState(id=agent_id, pos=pos)
-        self.id = agent_id
-
-    @property
-    def balance(self):
-        return self.state.balance
-
-    @balance.setter
-    def balance(self, value):
-        self.state.balance = max(0.0, value)
-
-    def step(self, world: 'AgentCityWorld'):
-        """Advance the agent's state by one tick."""
-        if self.state.energy <= 0:
-            return
-
-        # Background energy drain
-        self.state.energy -= 0.5
+    def decide(self, economy, buildings):
+        # Utility-based decision making
+        if self.state.energy < 20:
+            self.state.current_goal = "rest"
+            return self._seek_building(buildings, "home")
         
-        # Priority 1: Survival (Food) - Threshold 30%
-        if self.state.energy < 30:
-            self._seek_resource(world, "food")
-        # Priority 2: Work (Money) - Threshold 20 Credits
-        elif self.state.balance < 20:
-            self._work(world)
-        # Priority 3: Idle Wander
-        else:
-            self._wander(world)
+        if self.state.wealth < 10:
+            self.state.current_goal = "work"
+            return self._seek_building(buildings, "office")
 
-    def _get_distance(self, pos1: Position, pos2: Position) -> float:
-        """Calculate Euclidean distance between two points."""
-        return math.sqrt((pos1.x - pos2.x)**2 + (pos1.y - pos2.y)**2)
+        self.state.current_goal = "explore"
+        return self._random_move()
 
-    def _wander(self, world: 'AgentCityWorld'):
-        """Random movement within world bounds."""
-        directions = [(0,1), (0,-1), (1,0), (-1,0)]
-        dx, dy = random.choice(directions)
-        new_x = max(0, min(world.width - 1, self.state.pos.x + dx))
-        new_y = max(0, min(world.height - 1, self.state.pos.y + dy))
-        self.state.pos.x = new_x
-        self.state.pos.y = new_y
-
-    def _seek_resource(self, world: 'AgentCityWorld', resource_type: str):
-        """Find the nearest provider of a resource and consume it."""
-        targets = [b for b in world.businesses if b.business_type == "grocery"]
-        
-        if not targets:
-            self._wander(world)
-            return
-
-        nearest = min(targets, key=lambda b: self._get_distance(self.state.pos, b.pos))
-        dist = self._get_distance(self.state.pos, nearest.pos)
-
-        if dist <= 1.5:
-            price = world.marketplace.resource_prices.get(resource_type, 10.0)
-            if self.balance >= price:
-                if world.economy.transfer(self, nearest, price, ResourceType.FOOD, world.tick_count):
-                    self.state.energy = min(100.0, self.state.energy + 50)
-        else:
-            self._move_towards(nearest.pos)
-
-    def _work(self, world: 'AgentCityWorld'):
-        """Check job board and travel to workplace."""
-        jobs = world.marketplace.get_available_jobs()
-        
-        if jobs:
-            job = jobs[0]
-            employer = next((b for b in world.businesses if b.id == job.employer_id), None)
-            if employer:
-                dist = self._get_distance(self.state.pos, employer.pos)
-                if dist <= 1.5:
-                    # Check if employer can afford to pay
-                    if employer.balance >= job.salary:
-                        if world.economy.transfer(employer, self, job.salary, ResourceType.CREDITS, world.tick_count):
-                            self.state.energy -= 10
-                            world.marketplace.remove_job(job.job_id)
-                else:
-                    self._move_towards(employer.pos)
-                return
-
-        self._wander(world)
+    def _seek_building(self, buildings, b_type_name):
+        targets = [b for b in buildings if b.type.value == b_type_name]
+        if targets:
+            target = targets[0]
+            self._move_towards(target.pos)
+            if self.state.pos.x == target.pos.x and self.state.pos.y == target.pos.y:
+                self._perform_activity(b_type_name)
 
     def _move_towards(self, target_pos: Position):
-        """Step-wise movement towards a target coordinate on a grid (Orthogonal only)."""
-        if self.state.pos.x != target_pos.x:
-            self.state.pos.x += 1 if self.state.pos.x < target_pos.x else -1
-        elif self.state.pos.y != target_pos.y:
-            self.state.pos.y += 1 if self.state.pos.y < target_pos.y else -1
+        if self.state.pos.x < target_pos.x: self.state.pos.x += 1
+        elif self.state.pos.x > target_pos.x: self.state.pos.x -= 1
+        if self.state.pos.y < target_pos.y: self.state.pos.y += 1
+        elif self.state.pos.y > target_pos.y: self.state.pos.y -= 1
+        self.state.energy -= 0.5
+
+    def _random_move(self):
+        self.state.pos.x += random.choice([-1, 0, 1])
+        self.state.pos.y += random.choice([-1, 0, 1])
+        self.state.energy -= 0.2
+
+    def _perform_activity(self, activity):
+        if activity == "home":
+            self.state.energy = min(100, self.state.energy + 10)
+        elif activity == "office":
+            self.state.wealth += 5
+            self.state.energy -= 2
