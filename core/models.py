@@ -14,16 +14,12 @@ class AgentState(BaseModel):
     inventory: Dict[str, int] = {}
     profession: str = "UNEMPLOYED"
     current_goal: Optional[str] = None
-
-class DistrictType(BaseModel):
-    name: str
-    color: str
-    description: str
-    multiplier: float = 1.0
+    memory: List[str] = []
 
 class District(BaseModel):
     type: str
     area: List[Tuple[int, int]]
+    label: str
 
 class WorldState(BaseModel):
     width: int
