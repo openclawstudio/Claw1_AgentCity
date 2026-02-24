@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Optional
 from .models import ZoneType
 from .economy import EconomyManager
 from .market import Market
@@ -25,7 +25,7 @@ class World:
                 elif choice < 0.6: self.zones[(x, y)] = ZoneType.RESIDENTIAL
                 else: self.zones[(x, y)] = ZoneType.EMPTY
 
-    def get_zone(self, pos: Tuple[int, int]) -> ZoneType: # type: ignore
+    def get_zone(self, pos: Tuple[int, int]) -> ZoneType:
         return self.zones.get(pos, ZoneType.EMPTY)
 
     def get_zones_by_type(self, zone_type: ZoneType) -> List[Tuple[int, int]]:

@@ -1,33 +1,32 @@
 import unittest
 from core.world import World
-from core.agent import Citizen
+from core.agent import Agent
+from core.models import ZoneType
 
-class TestSimulation(unittest.TestCase):
+class TestAgentCity(unittest.TestCase):
     def test_world_init(self):
-        world = World(10, 10)
-        self.assertEqual(len(world.state.districts), 2)
+        world = World(5, 5)
+        self.assertEqual(len(world.zones), 25)
 
-    def test_agent_movement(self):
-        world = World(10, 10)
-        # Edge case: Put agent in middle so move is likely to succeed
-        agent = Citizen("Tester", 5, 5)
-        world.add_agent(agent)
-        original_pos = (agent.state.pos.x, agent.state.pos.y)
-        
-        # Force movement by trying multiple times if random fails
-        moved = False
-        for _ in range(10):
-            agent.wander(world)
-            if (agent.state.pos.x, agent.state.pos.y) != original_pos:
-                moved = True
-                break
-        self.assertTrue(moved)
+    def test_agent_energy_death(self):
+        world = World(5, 5)
+        agent = Agent("test", (0,0))
+        agent.state.energy = 0.1
+        world.agents.append(agent)
+        world.step()
+        self.assertFalse(agent.alive)
+        self.assertEqual(len(world.agents), 0)
 
-    def test_economy_transaction(self):
-        world = World(10, 10)
-        world.economy.record_transaction("A", "B", 10.0, "CREDITS", 1)
-        self.assertEqual(len(world.economy.transactions), 1)
-        self.assertEqual(world.economy.transactions[0].amount, 10.0)
+    def test_economy_transfer(self):
+        world = World(5, 5)
+        a1 = Agent("a1", (0,0))
+        a2 = Agent("a2", (0,0))
+        a1.state.wallet = 100
+        a2.state.wallet = 0
+        success = world.economy.transfer(a1, a2, 50, "test", 1)
+        self.assertTrue(success)
+        self.assertEqual(a1.state.wallet, 50)
+        self.assertEqual(a2.state.wallet, 50)
 
 if __name__ == '__main__':
     unittest.main()
