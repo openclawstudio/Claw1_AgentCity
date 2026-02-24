@@ -13,38 +13,39 @@ class CitizenAgent:
 
     def decide(self, economy: 'EconomySystem', buildings: List[Building], world_width: int, world_height: int):
         """Main decision logic based on internal utility."""
-        # Determing move target or activity
+        # Determine move target or activity
         if self.state.energy < 20:
             self.state.current_goal = "rest"
-            return self._seek_building(economy, buildings, BuildingType.HOME)
+            return self._seek_building(economy, buildings, BuildingType.HOME, world_width, world_height)
         
         if self.state.wealth < 15:
             self.state.current_goal = "work"
-            return self._seek_building(economy, buildings, BuildingType.OFFICE)
+            return self._seek_building(economy, buildings, BuildingType.OFFICE, world_width, world_height)
 
         if self.state.wealth >= 30 and self.state.energy < 70:
             self.state.current_goal = "shop"
-            return self._seek_building(economy, buildings, BuildingType.MARKET)
+            return self._seek_building(economy, buildings, BuildingType.MARKET, world_width, world_height)
 
         self.state.current_goal = "explore"
         return self._random_move(world_width, world_height)
 
-    def _seek_building(self, economy: 'EconomySystem', buildings: List[Building], b_type: BuildingType):
+    def _seek_building(self, economy: 'EconomySystem', buildings: List[Building], b_type: BuildingType, w: int, h: int):
         targets = [b for b in buildings if b.type == b_type]
         if not targets:
             self.state.current_goal = "wandering (no targets)"
-            return self._random_move(30, 30) # Default size fallback
+            return self._random_move(w, h)
 
         # Manhattan distance
         target = min(targets, key=lambda b: abs(b.pos.x - self.state.pos.x) + abs(b.pos.y - self.state.pos.y))
         
         if self.state.pos.x == target.pos.x and self.state.pos.y == target.pos.y:
-            target.enter(self.state.id)
+            if self.state.id not in target.occupants:
+                target.enter(self.state.id)
             self._perform_activity(economy, target)
         else:
-            # Ensure they exit any building they were in if they are moving
+            # If moving, ensure we exit any building we might be in
             for b in buildings:
-                if b.pos.x != self.state.pos.x or b.pos.y != self.state.pos.y:
+                if self.state.id in b.occupants:
                     b.exit(self.state.id)
             self._move_towards(target.pos)
 
