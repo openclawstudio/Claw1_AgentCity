@@ -8,7 +8,7 @@ class Citizen:
         self.id = str(uuid.uuid4())[:8]
         self.state = AgentState(
             id=self.id, 
-            name=name, 
+            name=name,
             pos=Position(x=x, y=y),
             inventory={}
         )
@@ -27,7 +27,6 @@ class Citizen:
             self.state.current_goal = "FIND_SHELTER"
             self.seek_energy(world)
         elif self.state.wallet > 150:
-            # High variety of movement when 'rich'
             self.state.current_goal = "RELAX"
             self.wander(world)
         else:
@@ -41,10 +40,9 @@ class Citizen:
 
     def wander(self, world):
         """Move randomly in any direction."""
-        if random.random() < 0.8:
-            dx = random.randint(-1, 1)
-            dy = random.randint(-1, 1)
-            self._move_clamped(world, dx, dy)
+        dx = random.randint(-1, 1)
+        dy = random.randint(-1, 1)
+        self._move_clamped(world, dx, dy)
 
     def seek_energy(self, world):
         """Try to reach residential zones to buy energy/rest."""
@@ -59,11 +57,11 @@ class Citizen:
                 )
             else:
                 # Passive recovery if broke
-                self.state.energy = min(100.0, self.state.energy + 1.0)
+                self.state.energy = min(100.0, self.state.energy + 2.0)
         else:
-            # Move Left towards Residential (World design: 0 to mid_x)
+            # Move Left towards Residential (0 to mid_x)
             dx = -1 if self.state.pos.x > 0 else 0
-            dy = random.randint(-1, 1)
+            dy = 1 if self.state.pos.y < (world.state.height // 2) else -1
             self._move_clamped(world, dx, dy)
 
     def seek_commerce(self, world):
@@ -77,9 +75,9 @@ class Citizen:
                 "MARKET", self.id, wage, "CREDITS", world.state.tick
             )
         else:
-            # Move Right towards Commercial (World design: mid_x to Width)
+            # Move Right towards Commercial (mid_x to width)
             dx = 1 if self.state.pos.x < world.state.width - 1 else 0
-            dy = random.randint(-1, 1)
+            dy = 1 if self.state.pos.y < (world.state.height // 2) else -1
             self._move_clamped(world, dx, dy)
 
     def _move_clamped(self, world, dx: int, dy: int):
