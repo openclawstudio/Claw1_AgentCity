@@ -1,20 +1,35 @@
-import logging
-from typing import Any, List
+import random
+from core.models import ZoneType, Position
 
-logger = logging.getLogger("Brain")
+class Brain:
+    def __init__(self):
+        self.memory = []
 
-class BaseBrain:
-    def __init__(self, agent: Any):
-        self.agent = agent
+    def decide_action(self, state, world):
+        # Simple heuristic decision making
+        if state.energy < 30:
+            return "seek_rest" # Residential
+        elif state.wallet.balance < 10:
+            return "seek_work" # Industrial
+        else:
+            return "socialize" # Commercial
 
-    async def decide(self, world: Any, nearby_entities: List[Any]) -> str:
-        raise NotImplementedError("Brains must implement decide()")
+    def get_target_position(self, action, current_pos, world):
+        target_zone = ZoneType.RESIDENTIAL
+        if action == "seek_work":
+            target_zone = ZoneType.INDUSTRIAL
+        elif action == "socialize":
+            target_zone = ZoneType.COMMERCIAL
 
-class SimpleBrain(BaseBrain):
-    async def decide(self, world: Any, nearby_entities: List[Any]) -> str:
-        # Check if hungry
-        if self.agent.energy < 40:
-            return "search_food"
+        # Find nearest zone of type
+        best_pos = current_pos
+        min_dist = float('inf')
         
-        # Logic to potentially interact with businesses (future phase)
-        return "explore"
+        for coord, zone in world.grid.items():
+            if zone == target_zone:
+                dist = abs(coord[0] - current_pos.x) + abs(coord[1] - current_pos.y)
+                if dist < min_dist:
+                    min_dist = dist
+                    best_pos = Position(x=coord[0], y=coord[1])
+        
+        return best_pos

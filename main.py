@@ -1,90 +1,43 @@
-import asyncio
-import uuid
-import logging
-import random
+import time
+import os
 from core.world import World
-from core.agent import CitizenAgent, BusinessAgent
-from core.models import AgentState, Vector2D, EntityType, SimulationConfig
+from core.agent import Citizen
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-)
-logger = logging.getLogger("Main")
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
 
-async def main():
-    config = SimulationConfig(width=50, height=50)
-    city = World(config)
+def main():
+    city = World(20, 20)
     
-    # 1. Spawn Critical Businesses (Infrastructure)
-    # Food Hub in the Market
-    market_pos = Vector2D(x=25, y=25)
-    biz_state = AgentState(
-        id="market_stall_1",
-        name="Market Deli",
-        position=market_pos,
-        type=EntityType.BUSINESS,
-        metadata={"service_type": "food"}
-    )
-    city.add_agent(biz_state)
-    
-    # Job Board / Town Hall
-    hall_state = AgentState(
-        id="town_hall",
-        name="Citizen Center",
-        position=Vector2D(x=20, y=20),
-        type=EntityType.BUSINESS,
-        metadata={"service_type": "job_board"}
-    )
-    city.add_agent(hall_state)
+    # Populate City
+    citizens = [
+        Citizen("Alice", 0, 0),
+        Citizen("Bob", 5, 5),
+        Citizen("Charlie", 10, 10)
+    ]
+    for c in citizens:
+        city.add_agent(c)
 
-    # 2. Spawn Citizens
-    agents = []
-    for i in range(12):
-        state = AgentState(
-            id=str(uuid.uuid4())[:8],
-            name=f"Citizen_{i}",
-            position=Vector2D(x=random.randint(0, 49), y=random.randint(0, 49))
-        )
-        # Give initial capital
-        state.economy.balance = random.uniform(10.0, 30.0)
-        city.add_agent(state)
-        agents.append(CitizenAgent(state))
-        
-    # Create a wrapper for businesses to satisfy the loop if needed
-    business_entities = [BusinessAgent(city.agents["market_stall_1"]), BusinessAgent(city.agents["town_hall"])]
-
-    print("\n--- AgentCity MVP Starting ---")
-    print(f"Initialized city with {len(agents)} citizens and {len(city.services)} service types.\n")
-    
+    print("Starting AgentCity simulation...")
     try:
-        for tick in range(200): 
-            # 1. Update World Physics/Rules
-            await city.tick()
+        while True:
+            city.step()
             
-            # 2. Run Agents
-            citizen_tasks = [agent.decide_action(city) for agent in agents]
-            business_tasks = [biz.decide_action(city) for biz in business_entities]
-            await asyncio.gather(*(citizen_tasks + business_tasks))
+            # Dashboard
+            clear_screen()
+            print(f"--- AgentCity Metrics (Tick: {city.tick_counter}) ---")
+            total_gdp = sum(c.state.wallet.balance for c in city.agents.values())
+            avg_energy = sum(c.state.energy for c in city.agents.values()) / len(city.agents)
             
-            # 3. Reporting
-            if tick % 20 == 0:
-                active_agents = [a for a in agents if a.state.energy > 0]
-                avg_bal = sum(a.state.economy.balance for a in agents) / len(agents) if agents else 0
-                print(f"Tick {tick:03d} | Active: {len(active_agents)} | Avg $: {avg_bal:.2f} | TXs: {len(city.ledger.history)}")
-                if active_agents:
-                    lead = random.choice(active_agents)
-                    zone = city.get_zone(lead.state.position)
-                    print(f"  [Spotlight] {lead.state.name} at {lead.state.position} in {zone} (E: {lead.state.energy:.1f})")
+            print(f"Population: {len(city.agents)} | Total GDP: {total_gdp:.2f} | Avg Energy: {avg_energy:.1f}")
+            print("\nCitizen Status:")
+            for c in city.agents.values():
+                zone = city.get_zone(c.pos)
+                print(f"- {c.name}: Pos({c.pos.x}, {c.pos.y}) | Energy: {c.state.energy:.1f} | Wallet: {c.state.wallet.balance:.2f} | Zone: {zone.name}")
             
-            await asyncio.sleep(0.01)
-            
+            time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nSimulation stopped by user.")
-    except Exception as e:
-        logger.exception(f"Simulation crashed: {e}")
-    finally:
-        print("--- Simulation Terminated ---")
+        print("\nSimulation paused. City state saved.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

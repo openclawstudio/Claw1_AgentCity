@@ -1,71 +1,46 @@
-import random
-import logging
-from core.models import AgentState, Vector2D, JobStatus, EntityType
+import uuid
+from core.models import Position, AgentState, Transaction
+from core.brain import Brain
 
-logger = logging.getLogger("Agent")
+class Citizen:
+    def __init__(self, name: str, x: int, y: int):
+        self.id = str(uuid.uuid4())
+        self.name = name
+        self.pos = Position(x=x, y=y)
+        self.state = AgentState()
+        self.brain = Brain()
 
-class CitizenAgent:
-    def __init__(self, state: AgentState):
-        self.state = state
-
-    async def decide_action(self, world):
-        if self.state.energy <= 0:
-            return 
-
-        # Logic: Priority is survival -> recovery -> wealth
-        if self.state.energy < 30:
-            await self.go_rest(world)
-        elif self.state.economy.balance < 10:
-            await self.handle_economy(world)
-        elif self.state.energy < 70 and self.state.economy.balance >= 15:
-            await self.handle_survival(world)
-        else:
-            self.wander(world)
-
-    async def handle_survival(self, world):
-        target = world.get_closest_service(self.state.position, "food") or Vector2D(x=25, y=25)
-        if self.state.position.distance_to(target) < 2:
-            # Try to find a business to buy food from
-            for aid, other in world.agents.items():
-                if other.type == EntityType.BUSINESS and other.position.distance_to(self.state.position) < 2:
-                    if await world.process_transaction(self.state.id, aid, 10, "food"):
-                        self.state.energy = min(100.0, self.state.energy + 40)
-                        return
-        self.move_towards(target, world)
-
-    async def go_rest(self, world):
-        # Parks provide passive regen in World.tick(), so just moving there helps
-        target = world.get_closest_service(self.state.position, "rest") or Vector2D(x=5, y=5)
-        self.move_towards(target, world)
-
-    async def handle_economy(self, world):
-        target = world.get_closest_service(self.state.position, "job_board") or Vector2D(x=20, y=20)
-        if self.state.position.distance_to(target) < 1.5:
-            # Simulate work cycle
-            self.state.economy.balance += 15.0
-            self.state.energy = max(0, self.state.energy - 10.0)
-        else:
-            self.move_towards(target, world)
-
-    def move_towards(self, target: Vector2D, world):
-        new_x, new_y = self.state.position.x, self.state.position.y
-        if self.state.position.x < target.x: new_x += 1
-        elif self.state.position.x > target.x: new_x -= 1
-        if self.state.position.y < target.y: new_y += 1
-        elif self.state.position.y > target.y: new_y -= 1
+    def step(self, world):
+        # 1. Decide
+        action = self.brain.decide_action(self.state, world)
         
-        self.state.position.x = max(0, min(world.config.width - 1, new_x))
-        self.state.position.y = max(0, min(world.config.height - 1, new_y))
+        # 2. Plan path
+        target = self.brain.get_target_position(action, self.pos, world)
+        
+        # 3. Move
+        self._move_towards(target)
 
-    def wander(self, world):
-        dx, dy = random.choice([(0,1), (0,-1), (1,0), (-1,0), (0,0)])
-        target = Vector2D(x=self.state.position.x + dx, y=self.state.position.y + dy)
-        self.move_towards(target, world)
+        # 4. Perform Action / Economic loop
+        current_zone = world.get_zone(self.pos)
+        self._process_zone_effects(current_zone, world)
+        
+        # 5. Decay
+        self.state.energy -= 0.5
 
-class BusinessAgent:
-    def __init__(self, state: AgentState):
-        self.state = state
+    def _move_towards(self, target):
+        if self.pos.x < target.x: self.pos.x += 1
+        elif self.pos.x > target.x: self.pos.x -= 1
+        if self.pos.y < target.y: self.pos.y += 1
+        elif self.pos.y > target.y: self.pos.y -= 1
 
-    async def decide_action(self, world):
-        # Businesses are static in this MVP but could adjust prices later
-        pass
+    def _process_zone_effects(self, zone, world):
+        from core.models import ZoneType
+        if zone == ZoneType.INDUSTRIAL:
+            self.state.wallet.balance += 2.0
+            self.state.energy -= 1.0
+        elif zone == ZoneType.RESIDENTIAL:
+            self.state.energy = min(100, self.state.energy + 5.0)
+        elif zone == ZoneType.COMMERCIAL:
+            if self.state.wallet.balance >= 1.0:
+                self.state.wallet.balance -= 1.0
+                self.state.happiness += 2.0

@@ -1,97 +1,38 @@
-import asyncio
-import logging
-from typing import Dict, List, Optional, Any
-from core.models import AgentState, Vector2D, Transaction, EntityType, SimulationConfig
-
-logger = logging.getLogger("WorldEngine")
-
-class Ledger:
-    def __init__(self):
-        self.history: List[Transaction] = []
-
-    def record(self, transaction: Transaction):
-        self.history.append(transaction)
-        logger.info(f"[TX] {transaction.sender_id} -> {transaction.receiver_id}: ${transaction.amount} ({transaction.item or 'Service'})")
+import random
+from typing import Dict, List, Tuple
+from core.models import Position, ZoneType, Transaction
 
 class World:
-    def __init__(self, config: Optional[SimulationConfig] = None):
-        self.config = config or SimulationConfig()
+    def __init__(self, width: int, height: int):
+        self.width = width
+        self.height = height
+        self.grid: Dict[Tuple[int, int], ZoneType] = {}
+        self.agents: Dict[str, any] = {}
         self.tick_counter = 0
-        self.agents: Dict[str, AgentState] = {}
-        self.ledger = Ledger()
-        self.events: List[dict] = []
-        # Service Registry for discovery
-        self.services: Dict[str, List[str]] = {"food": [], "job_board": [], "rest": []}
-        self.zones = {
-            "park": {"x": range(0, 11), "y": range(0, 11), "bonus": "energy_regen"},
-            "market": {"x": range(20, 31), "y": range(20, 31), "bonus": "trade_hub"}
-        }
+        self.ledger: List[Transaction] = []
+        self._initialize_zones()
 
-    def add_agent(self, agent_state: AgentState):
-        self.agents[agent_state.id] = agent_state
-        # Auto-register services if it's a business
-        if agent_state.type == EntityType.BUSINESS:
-            svc_type = agent_state.metadata.get("service_type")
-            if svc_type in self.services:
-                if agent_state.id not in self.services[svc_type]:
-                    self.services[svc_type].append(agent_state.id)
+    def _initialize_zones(self):
+        for x in range(self.width):
+            for y in range(self.height):
+                # Basic procedural zoning
+                if (x + y) % 5 == 0:
+                    self.grid[(x, y)] = ZoneType.COMMERCIAL
+                elif (x * y) % 4 == 0:
+                    self.grid[(x, y)] = ZoneType.INDUSTRIAL
+                else:
+                    self.grid[(x, y)] = ZoneType.RESIDENTIAL
 
-    def get_closest_service(self, pos: Vector2D, service_type: str) -> Optional[Vector2D]:
-        service_ids = self.services.get(service_type, [])
-        if not service_ids:
-            return None
-        
-        closest_pos = None
-        min_dist = float('inf')
-        for sid in service_ids:
-            if sid in self.agents:
-                target_pos = self.agents[sid].position
-                dist = pos.distance_to(target_pos)
-                if dist < min_dist:
-                    min_dist = dist
-                    closest_pos = target_pos
-        return closest_pos
+    def get_zone(self, pos: Position) -> ZoneType:
+        return self.grid.get((pos.x, pos.y), ZoneType.OPEN_SPACE)
 
-    def get_zone(self, pos: Vector2D) -> str:
-        for zone_name, data in self.zones.items():
-            if pos.x in data['x'] and pos.y in data['y']:
-                return zone_name
-        return "suburbs"
+    def add_agent(self, agent):
+        self.agents[agent.id] = agent
 
-    async def process_transaction(self, sender_id: str, receiver_id: str, amount: float, item: str = None) -> bool:
-        if amount <= 0:
-            return False
-            
-        sender = self.agents.get(sender_id)
-        receiver = self.agents.get(receiver_id)
-        
-        if sender and receiver and sender.economy.balance >= amount:
-            sender.economy.balance -= amount
-            receiver.economy.balance += amount
-            tx = Transaction(
-                sender_id=sender_id, 
-                receiver_id=receiver_id,
-                amount=amount, 
-                item=item,
-                timestamp=self.tick_counter
-            )
-            self.ledger.record(tx)
-            return True
-        return False
+    def record_transaction(self, tx: Transaction):
+        self.ledger.append(tx)
 
-    async def tick(self):
+    def step(self):
         self.tick_counter += 1
-        if len(self.events) > 100: self.events = self.events[-100:]
-        
-        for agent_id, state in self.agents.items():
-            zone = self.get_zone(state.position)
-            # Apply environmental bonuses
-            if zone == "park" and state.energy < 100:
-                state.energy = min(100.0, state.energy + self.config.recovery_rate)
-            
-            # Energy decay logic
-            if state.energy > 0:
-                decay = self.config.energy_decay / 2 if state.type == EntityType.BUSINESS else self.config.energy_decay
-                state.energy = max(0.0, state.energy - decay)
-                if state.energy <= 0 and state.type == EntityType.CITIZEN:
-                    logger.warning(f"Agent {agent_id} ({state.name}) has collapsed.")
+        for agent in self.agents.values():
+            agent.step(self)
