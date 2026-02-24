@@ -1,5 +1,5 @@
-from typing import List
-from .models import Job, Position
+from typing import List, Dict
+from .models import Job, Position, ResourceType
 
 class JobBoard:
     def __init__(self):
@@ -11,10 +11,12 @@ class JobBoard:
     def take_job(self, agent_id: str) -> Job:
         if not self.available_jobs:
             return None
-        # Simple FIFO for MVP
         return self.available_jobs.pop(0)
 
 class Market:
     def __init__(self):
         self.job_board = JobBoard()
-        self.resource_prices = {"food": 10.0, "materials": 25.0}
+        self.resource_prices: Dict[ResourceType, float] = {
+            ResourceType.FOOD: 10.0, 
+            ResourceType.MATERIALS: 25.0
+        }
