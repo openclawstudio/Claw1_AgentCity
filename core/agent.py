@@ -1,7 +1,7 @@
 import uuid
 import random
 from typing import Optional
-from .models import AgentState, Position, Job, InventoryItem, ResourceType
+from .models import AgentState, Position, Job, InventoryItem, ResourceType, ZoneType
 from .market import Market
 from .economy import EconomyManager
 
@@ -26,10 +26,17 @@ class Citizen:
         self.state.balance = val
 
     def step(self, market: Market, economy: EconomyManager, world):
+        current_cell = world.get_cell(self.state.pos)
+        
         # 1. Survival Logic: If low energy and has money, buy food
+        # Ideally, food should be bought in Commercial zones
         food_price = market.resource_prices.get(ResourceType.FOOD, 10.0)
         if self.state.energy < 30 and self.state.balance >= food_price:
-            self.buy_resource(ResourceType.FOOD, market)
+            if current_cell.zone == ZoneType.COMMERCIAL:
+                self.buy_resource(ResourceType.FOOD, market)
+            else:
+                self.move_towards_zone(ZoneType.COMMERCIAL, world)
+            return
             
         # 2. Activity Logic
         if self.state.energy < 20:
@@ -39,10 +46,9 @@ class Citizen:
             self.state.current_goal = "SEEKING_WORK"
             job = market.job_board.take_job(self.id)
             if job:
-                if self.state.energy > job.energy_cost:
+                if self.state.energy > job.energy_cost + 5: # Buffer for travel
                     self.work(job, economy, world)
                 else:
-                    # Not enough energy for this specific job, put it back or ignore
                     market.job_board.post_job(job)
                     self.state.current_goal = "TOO_TIRED_FOR_WORK"
             else:
@@ -52,23 +58,40 @@ class Citizen:
             self.move_randomly(world)
             self.state.energy -= 2
 
-    def move_randomly(self, world):
-        # Safe removal from current location
+    def move_towards_zone(self, zone_type: ZoneType, world):
+        # Simple pathfinding: look for nearest cell with target zone
+        target_pos = None
+        for x in range(world.width):
+            for y in range(world.height):
+                if world.grid[x][y].zone == zone_type:
+                    target_pos = Position(x=x, y=y)
+                    break
+            if target_pos: break
+        
+        if target_pos:
+            dx = 1 if target_pos.x > self.state.pos.x else -1 if target_pos.x < self.state.pos.x else 0
+            dy = 1 if target_pos.y > self.state.pos.y else -1 if target_pos.y < self.state.pos.y else 0
+            self.move_to(Position(x=self.state.pos.x + dx, y=self.state.pos.y + dy), world)
+
+    def move_to(self, new_pos: Position, world):
+        # Validate bounds
+        new_pos.x = max(0, min(world.width - 1, new_pos.x))
+        new_pos.y = max(0, min(world.height - 1, new_pos.y))
+        
+        # Update world registration
         try:
             current_cell = world.get_cell(self.state.pos)
             if self.id in current_cell.agents:
                 current_cell.agents.remove(self.id)
-        except (IndexError, AttributeError):
-            pass
-        
-        moves = [(0,1), (0,-1), (1,0), (-1,0), (0,0)]
-        dx, dy = random.choice(moves)
-        new_x = max(0, min(world.width - 1, self.state.pos.x + dx))
-        new_y = max(0, min(world.height - 1, self.state.pos.y + dy))
-        self.state.pos = Position(x=new_x, y=new_y)
-        
-        # Add to new cell tracking
+        except: pass
+
+        self.state.pos = new_pos
         world.get_cell(self.state.pos).agents.append(self.id)
+
+    def move_randomly(self, world):
+        moves = [(0,1), (0,-1), (1,0), (-1,0)] # Removed (0,0) to ensure movement when possible
+        dx, dy = random.choice(moves)
+        self.move_to(Position(x=self.state.pos.x + dx, y=self.state.pos.y + dy), world)
 
     def buy_resource(self, res_type: ResourceType, market: Market):
         cost = market.resource_prices.get(res_type, 100.0)
@@ -77,7 +100,6 @@ class Citizen:
             if res_type == ResourceType.FOOD:
                 self.state.energy = min(100.0, self.state.energy + 40.0)
             
-            # Update Inventory
             found = False
             for item in self.state.inventory:
                 if item.type == res_type:
@@ -86,28 +108,14 @@ class Citizen:
                     break
             if not found:
                 self.state.inventory.append(InventoryItem(type=res_type, amount=1.0))
-                
-            print(f"Agent {self.state.name} bought {res_type.value} for {cost}")
+            print(f"Agent {self.state.name} bought {res_type.value} at position {self.state.pos}")
 
     def work(self, job: Job, economy: EconomyManager, world):
-        # Check energy one last time
         if self.state.energy < job.energy_cost:
             return
-            
-        # Ensure agent is moved to the job site
-        old_cell = world.get_cell(self.state.pos)
-        if self.id in old_cell.agents:
-            old_cell.agents.remove(self.id)
-            
-        self.state.pos = job.location
-        world.get_cell(self.state.pos).agents.append(self.id)
-        
-        # Process work mechanics
+        self.move_to(job.location, world)
         self.state.energy -= job.energy_cost
         self.state.balance += job.payout
-        
-        # Financial transaction record through central manager
         economy.record_payout(job.employer_id, self.id, job.payout, job.title)
-        
         job.completed = True
-        print(f"Agent {self.state.name} completed job: {job.title} (+{job.payout})")
+        print(f"Agent {self.state.name} completed job: {job.title} (+{job.payout} credits)")
