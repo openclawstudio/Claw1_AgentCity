@@ -34,7 +34,7 @@ class Agent:
             if possible_sites:
                 self.workplace = random.choice(possible_sites)
 
-        # Determine destination
+        # Determine destination priority
         if self.state.energy < 30:
             res_zones = world.get_zones_by_type(ZoneType.RESIDENTIAL)
             if res_zones:
@@ -45,6 +45,7 @@ class Agent:
         if target_pos and target_pos != self.state.pos:
             new_pos = self._move_towards(target_pos)
         else:
+            # Wander or stay put
             dx, dy = random.choice([(0,1), (0,-1), (1,0), (-1,0), (0,0)])
             new_pos = (max(0, min(world.width - 1, self.state.pos[0] + dx)),
                        max(0, min(world.height - 1, self.state.pos[1] + dy)))
@@ -52,6 +53,7 @@ class Agent:
         self.state.pos = new_pos
         
         # 2. Energy Consumption
+        # Base metabolism cost
         self.state.energy -= 0.5
         if self.state.energy <= 0:
             self.alive = False
@@ -61,34 +63,37 @@ class Agent:
         current_zone = world.get_zone(self.state.pos)
         
         if current_zone == ZoneType.INDUSTRIAL:
-            # Production logic
-            if self.state.energy > 20.0:
+            # Production logic for industrial workers
+            if self.state.job_role in ["producer", "worker"] and self.state.energy > 40.0:
                 self.state.inventory["resource"] = self.state.inventory.get("resource", 0) + 1
-                self.state.energy -= 8.0
+                self.state.energy -= 10.0
                 
                 # Create offer only if we have stock not already listed
                 listed_qty = sum(o.quantity for o in world.market.offers.values() if o.creator_id == self.id)
                 actual_qty = self.state.inventory.get("resource", 0)
                 if actual_qty > listed_qty:
-                    world.market.post_offer(self.id, "resource", 15.0, 1, self.state.inventory)
+                    world.market.post_offer(self.id, "resource", 12.0, 1, self.state.inventory)
 
         elif current_zone == ZoneType.COMMERCIAL:
             # Economic participation: Working for wage
-            if self.state.energy > 15.0:
-                self.state.wallet += 8.0
+            if self.state.energy > 20.0:
+                self.state.wallet += 10.0
                 self.state.energy -= 5.0
 
         elif current_zone == ZoneType.RESIDENTIAL:
             # Rest logic with cost
-            if self.state.energy < 100 and self.state.wallet >= 1.0:
-                self.state.energy = min(100.0, self.state.energy + 20.0)
-                self.state.wallet -= 1.0
+            if self.state.energy < 100 and self.state.wallet >= 2.0:
+                self.state.energy = min(100.0, self.state.energy + 25.0)
+                self.state.wallet -= 2.0
 
         # 4. Market Interaction (Consumption)
-        if self.state.energy < 40 and self.state.wallet >= 15:
+        # If hungry/low energy, try to buy and consume a resource
+        if self.state.energy < 50 and self.state.wallet >= 15:
             resource_offers = [oid for oid, o in world.market.offers.items() if o.item == "resource" and o.creator_id != self.id]
             if resource_offers:
+                # Sort by price (Greedy buyer)
+                resource_offers.sort(key=lambda oid: world.market.offers[oid].price)
                 if world.market.fulfill_offer(resource_offers[0], self, world.agent_map, world.tick_count, world.economy):
                     if self.state.inventory.get("resource", 0) > 0:
                         self.state.inventory["resource"] -= 1
-                        self.state.energy = min(100.0, self.state.energy + 50.0)
+                        self.state.energy = min(100.0, self.state.energy + 40.0)
